@@ -1,3 +1,4 @@
+const {requireRoles}=require('./middlewares/auth');
 const {asyncRoute}=require('./auth');
 const {utcDate}=require('./order-board');
 function reviewInput(body){if(!body||!Number.isInteger(body.rating)||body.rating<1||body.rating>5||typeof body.comment!=='string'||body.comment.length>1000)throw new Error('Escolha uma nota de 1 a 5 e comentário de até 1000 caracteres.');return {rating:body.rating,comment:body.comment.trim()};}
@@ -21,9 +22,9 @@ function installReviews(app,db,auth){
    await conn.execute('INSERT INTO order_reviews(order_id,rating,comment) VALUES (?,?,?)',[order.id,input.rating,input.comment]);await conn.commit();res.status(201).json({ok:true});
   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
  }));
- app.get('/api/admin/reviews',auth,(req,res,next)=>['owner','manager'].includes(req.user.role)?next():res.status(403).json({error:'Seu perfil não permite consultar avaliações.'}),asyncRoute(async(req,res)=>{
+ app.get('/api/admin/reviews',auth,requireRoles('tenant_owner','tenant_manager'),asyncRoute(async(req,res)=>{
   let selection;try{selection=filters(req.query);}catch(e){return res.status(400).json({error:e.message});}
-  const conn=await db.getConnection();try{await conn.beginTransaction();const company=req.user.company_id;
+  const conn=await db.getConnection();try{await conn.beginTransaction();const company=req.tenantId;
    const from='FROM order_reviews r JOIN orders o ON o.id=r.order_id WHERE o.company_id=?';
    const [[summary]]=await conn.execute(`SELECT COUNT(*) AS total,ROUND(AVG(r.rating),2) AS average,SUM(CASE WHEN r.rating<=2 THEN 1 ELSE 0 END) AS low_ratings ${from}`,[company]);
    const [distribution]=await conn.execute(`SELECT r.rating,COUNT(*) AS total ${from} GROUP BY r.rating ORDER BY r.rating`,[company]);

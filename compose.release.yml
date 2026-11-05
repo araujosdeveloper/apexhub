@@ -33,6 +33,9 @@ services:
     tmpfs:
       - /tmp
   app:
+    env_file:
+      - path: .env.jwt
+        required: false
     build: .
     restart: unless-stopped
     environment:

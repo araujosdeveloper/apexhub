@@ -1,3 +1,4 @@
+const {requireRoles}=require('./middlewares/auth');
 const { asyncRoute } = require('./auth');
 const { loadOperations, availability } = require('./operations');
 const { localDay, reportPeriod } = require('./reports');
@@ -5,12 +6,12 @@ const { utcDate } = require('./order-board');
 
 // Indicadores por dia civil da loja. Não infere tempo real sem timestamps das etapas.
 function installDashboard(app, db, auth) {
-  const permitted = (req,res,next) => ['owner','manager'].includes(req.user.role) ? next() : res.status(403).json({error:'Seu perfil não permite consultar a visão geral.'});
+  const permitted = requireRoles('tenant_owner','tenant_manager');
   app.get('/api/admin/dashboard', auth, permitted, asyncRoute(async (req,res) => {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
-      const company = req.user.company_id, config = await loadOperations(conn,company);
+      const company = req.tenantId, config = await loadOperations(conn,company);
       const end = localDay(new Date(),config.timezone);
       const start = new Date(Date.parse(end+'T00:00:00Z')-6*86400000).toISOString().slice(0,10);
       const period = reportPeriod({start,end},config.timezone), today = period.days.at(-1);
@@ -47,7 +48,7 @@ function installDashboard(app, db, auth) {
   app.get('/api/admin/dashboard/search',auth,permitted,asyncRoute(async(req,res)=>{
     const query=req.query.q;
     if(typeof query!=='string'||query.trim().length<2||query.length>80)return res.status(400).json({error:'Digite de 2 a 80 caracteres.'});
-    const text=query.trim(),pattern='%'+text.replace(/[=%_]/g,'=$&')+'%',company=req.user.company_id;
+    const text=query.trim(),pattern='%'+text.replace(/[=%_]/g,'=$&')+'%',company=req.tenantId;
     const id=Number(text.replace(/^#/,'')),byId=Number.isSafeInteger(id)&&id>0;
     const [orders]=await db.execute(`SELECT id,customer_name,status FROM orders WHERE company_id=? AND (customer_name LIKE ? ESCAPE '='${byId?' OR id=?':''}) ORDER BY id DESC LIMIT 4`,[company,pattern,...(byId?[id]:[])]);
     const [products]=await db.execute("SELECT id,name FROM products WHERE company_id=? AND name LIKE ? ESCAPE '=' ORDER BY name,id LIMIT 4",[company,pattern]);

@@ -78,7 +78,7 @@ function quoteDelivery(config, method, neighborhood) {
 }
 function installOperations(app, db, auth, manage) {
   app.get('/api/admin/operations', auth, asyncRoute(async (req, res) => {
-    res.json({ operations: availability(await loadOperations(db, req.user.company_id)) });
+    res.json({ operations: availability(await loadOperations(db, req.tenantId)) });
   }));
   app.put('/api/admin/operations', auth, manage, asyncRoute(async (req, res) => {
     let config;
@@ -88,8 +88,8 @@ function installOperations(app, db, auth, manage) {
     try {
       await conn.beginTransaction();
       // Mesmo bloqueio usado no checkout: uma alteração não muda o frete no meio do pedido.
-      await conn.execute('SELECT id FROM companies WHERE id = ? FOR UPDATE', [req.user.company_id]);
-      await conn.execute('INSERT INTO company_operations (company_id, config) VALUES (?, ?) ON DUPLICATE KEY UPDATE config = VALUES(config)', [req.user.company_id, JSON.stringify(config)]);
+      await conn.execute('SELECT id FROM companies WHERE id = ? FOR UPDATE', [req.tenantId]);
+      await conn.execute('INSERT INTO company_operations (company_id, config) VALUES (?, ?) ON DUPLICATE KEY UPDATE config = VALUES(config)', [req.tenantId, JSON.stringify(config)]);
       await conn.commit();
       res.json({ operations: availability(config) });
     } catch (error) { await conn.rollback(); throw error; }

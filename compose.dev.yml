@@ -18,6 +18,9 @@ services:
       retries: 30
       start_period: 30s
   app:
+    env_file:
+      - path: .env.jwt
+        required: false
     build: .
     restart: unless-stopped
     environment:

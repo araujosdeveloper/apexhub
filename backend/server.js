@@ -1,5 +1,7 @@
 const mysql = require('mysql2/promise');
 const { createApp } = require('./src/app');
+const {configuration}=require('./src/jwt');
+const jwt=configuration(process.env,{required:process.env.NODE_ENV==='production'});
 if (!process.env.DB_PASSWORD) throw new Error('Configure DB_PASSWORD antes de iniciar a API. Consulte .env.example.');
 if (process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIES !== 'true') throw new Error('Produção exige HTTPS e SECURE_COOKIES=true.');
 const db = mysql.createPool({
@@ -16,6 +18,9 @@ async function start() {
   await db.execute('SELECT 1');
   // Falha antes de aceitar tráfego quando o banco ainda não recebeu a migração.
   for (const sql of [
+    'SELECT id,name,email,password_hash,active FROM platform_admins LIMIT 0',
+    'SELECT token_hash,admin_id,expires_at FROM platform_sessions LIMIT 0',
+    'SELECT id,admin_id,action,entity_id,details FROM platform_audit LIMIT 0',
     'SELECT id, company_id, code, config, version, usage_count FROM company_coupons LIMIT 0',
     'SELECT product_id, config, version FROM product_addons LIMIT 0',
     'SELECT company_id, config FROM company_operations LIMIT 0',
@@ -30,7 +35,7 @@ async function start() {
     'SELECT order_id, product_id, product_name, quantity, unit_price, total_price, addons_snapshot FROM order_items LIMIT 0',
     'SELECT company_id, request_key, request_hash, order_id FROM checkout_requests LIMIT 0'
   ]) await db.execute(sql);
-  const app = createApp(db, { secureCookies: process.env.SECURE_COOKIES === 'true' });
+  const app = createApp(db, { secureCookies: process.env.SECURE_COOKIES === 'true',jwt });
   const server = app.listen(Number(process.env.PORT || 3000), () => console.log('Delivery SaaS: API iniciada.'));
   const shutdown = () => { app.locals.orderEvents.closeAll(); server.close(async () => { await db.end(); process.exit(0); }); };
   process.once('SIGTERM', shutdown);

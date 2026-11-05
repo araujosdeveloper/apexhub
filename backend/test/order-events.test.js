@@ -5,8 +5,8 @@ const { createOrderEvents } = require('../src/order-events');
 function environment(options = {}) {
   const timers = [], cleared = [];
   const events = createOrderEvents({ ...options, interval: callback => { timers.push(callback); return { id: timers.length, unref() {} }; }, clear: timer => cleared.push(timer?.id) });
-  const connect = (company, { user = { company_id: company }, backpressure = false, broken = false } = {}) => {
-    const req = Object.assign(new EventEmitter(), { user: { company_id: company }, headers: { cookie: 'delivery_session=' + 'a'.repeat(64) } });
+  const connect = (company, { user = { id:1,role:'operator',company_id: company }, backpressure = false, broken = false } = {}) => {
+    const req = Object.assign(new EventEmitter(), { tenantId:company,user: { company_id: company }, headers: { cookie: 'delivery_session=' + 'a'.repeat(64) } });
     const res = Object.assign(new EventEmitter(), { messages: [], statusCode: 0, ended: false,
       status(code) { this.statusCode = code; return this; }, set(headers) { this.headers = headers; return this; }, flushHeaders() {}, json(value) { this.value = value; return this; },
       write(message) { if (broken) throw new Error('socket'); this.messages.push(message); return !backpressure; }, end() { this.ended = true; this.emit('close'); }

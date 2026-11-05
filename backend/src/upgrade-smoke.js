@@ -8,7 +8,7 @@ async function verifyUpgradeSmoke(db) {
   const { serve } = require('../test-support/http');
   const request = await serve(null, { execute: (...args) => db.execute(...args), getConnection: async () => ({
     execute: (...args) => db.execute(...args), beginTransaction: () => db.beginTransaction(), commit: () => db.commit(), rollback: () => db.rollback(), release() {}
-  }) });
+  }) },{jwt:require('../test-support/jwt').testJwt()});
   const json = (method, body, cookie, key) => ({ method, headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(body) });
   const slug = 'upgrade-' + randomUUID();
   const registration = await request('/api/auth/register', json('POST', { name: 'Ensaio', company_name: 'Loja de ensaio', slug, email: slug + '@example.com', password: randomUUID() }));
@@ -77,6 +77,7 @@ async function verifyUpgradeSmoke(db) {
   assert.equal((await request('/api/admin/operations', json('PUT', { ...operations, mode: 'paused' }, cookie))).status, 200);
   assert.equal((await request('/api/orders', json('POST', payload, null, randomUUID()))).status, 409);
   const pool={query:(...args)=>db.query(...args),execute:(...args)=>db.execute(...args),getConnection:async()=>({execute:(...args)=>db.execute(...args),beginTransaction:()=>db.beginTransaction(),commit:()=>db.commit(),rollback:()=>db.rollback(),release(){}})};
+  const minted=await request('/api/auth/token',json('POST',{},cookie));assert.equal(minted.status,200);const signed=await minted.json();assert.equal(signed.role,'tenant_owner');assert.equal(signed.tenant_id,me.user.company_id);assert.equal((await request('/api/admin/catalog',{headers:{Authorization:'Bearer '+signed.access_token}})).status,200);
   await require('../integration/master').verifyMaster(pool,request,{a:{id:me.user.company_id,cookie},b:{id:me.user.company_id,cookie},json});
 }
 module.exports = { verifyUpgradeSmoke };

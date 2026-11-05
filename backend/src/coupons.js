@@ -68,8 +68,8 @@ function installCoupons(app, db, auth, manage) {
   app.get('/api/admin/coupons', auth, asyncRoute(async (req, res) => {
     const offset = req.query.offset || '0';
     if (typeof offset !== 'string' || !/^\d{1,6}$/.test(offset) || Number(offset) > 100000) return res.status(400).json({ error: 'Página inválida.' });
-    const [[count]] = await db.execute('SELECT COUNT(*) AS total FROM company_coupons WHERE company_id = ?', [req.user.company_id]);
-    const [rows] = await db.execute(`SELECT id, code, config, version, usage_count FROM company_coupons WHERE company_id = ? ORDER BY id DESC LIMIT 50 OFFSET ${Number(offset)}`, [req.user.company_id]);
+    const [[count]] = await db.execute('SELECT COUNT(*) AS total FROM company_coupons WHERE company_id = ?', [req.tenantId]);
+    const [rows] = await db.execute(`SELECT id, code, config, version, usage_count FROM company_coupons WHERE company_id = ? ORDER BY id DESC LIMIT 50 OFFSET ${Number(offset)}`, [req.tenantId]);
     res.json({ coupons: rows.map(decodeCoupon), total: Number(count.total), offset: Number(offset), limit: 50, server_time: new Date().toISOString() });
   }));
   async function save(req, res) {
@@ -82,16 +82,16 @@ function installCoupons(app, db, auth, manage) {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
-      await conn.execute('SELECT id FROM companies WHERE id = ? FOR UPDATE', [req.user.company_id]);
+      await conn.execute('SELECT id FROM companies WHERE id = ? FOR UPDATE', [req.tenantId]);
       if (id !== null) {
-        const [rows] = await conn.execute('SELECT id, code, version FROM company_coupons WHERE id = ? AND company_id = ? FOR UPDATE', [id, req.user.company_id]);
+        const [rows] = await conn.execute('SELECT id, code, version FROM company_coupons WHERE id = ? AND company_id = ? FOR UPDATE', [id, req.tenantId]);
         if (!rows.length) { await conn.rollback(); return res.status(404).json({ error: 'Cupom não encontrado nesta loja.' }); }
         if (rows[0].code !== code) { await conn.rollback(); return res.status(400).json({ error: 'O código do cupom não pode ser alterado. Crie outro cupom.' }); }
         if (Number(rows[0].version) !== req.body.version) { await conn.rollback(); return res.status(409).json({ error: 'Outra edição foi salva. Recarregue a lista antes de editar.' }); }
-        await conn.execute('UPDATE company_coupons SET config = ?, version = version + 1 WHERE id = ? AND company_id = ?', [JSON.stringify(config), id, req.user.company_id]);
+        await conn.execute('UPDATE company_coupons SET config = ?, version = version + 1 WHERE id = ? AND company_id = ?', [JSON.stringify(config), id, req.tenantId]);
         await conn.commit(); return res.json({ success: true });
       }
-      const [result] = await conn.execute('INSERT INTO company_coupons (company_id, code, config, version, usage_count) VALUES (?, ?, ?, 1, 0)', [req.user.company_id, code, JSON.stringify(config)]);
+      const [result] = await conn.execute('INSERT INTO company_coupons (company_id, code, config, version, usage_count) VALUES (?, ?, ?, 1, 0)', [req.tenantId, code, JSON.stringify(config)]);
       await conn.commit(); res.status(201).json({ id: result.insertId });
     } catch (error) { await conn.rollback(); if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Este código já existe na sua loja.' }); throw error; }
     finally { conn.release(); }

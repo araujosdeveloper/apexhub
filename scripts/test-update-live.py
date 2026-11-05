@@ -74,7 +74,7 @@ class LiveUpdate(unittest.TestCase):
             root = Path(directory)
             for name in ['scripts','bin','backups/live','deploy/public-edge/routes','reports/release-20261103T025846Z-321081']:
                 (root/name).mkdir(parents=True)
-            for name in ['update-live.sh','live-backup-common.sh']:
+            for name in ['update-live.sh','live-backup-common.sh','ensure-jwt-keys.js']:
                 shutil.copy(ROOT/'scripts'/name, root/'scripts'/name)
             (root/'scripts/backup-live.sh').write_text(BACKUP)
             (root/'scripts/validate-mysql.sh').write_text('#!/bin/sh\nexit 0\n')

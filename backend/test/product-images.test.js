@@ -9,7 +9,7 @@ function fake({role='owner',missing=false,fail=false}={}){const calls=[];async f
  if(sql.includes('FROM sessions s'))return [[{id:1,company_id:7,role}]];
  if(sql.startsWith('SELECT id FROM products'))return [missing?[]:[{id:3}]];
  if(sql.startsWith('SELECT i.content_type'))return [missing?[]:[{content:png,content_type:'image/png',digest:imageInfo(png).digest}]];
- if(sql.startsWith('INSERT INTO product_images')||sql.startsWith('DELETE FROM product_images')){if(fail)throw new Error('Falha');return [{affectedRows:1}];}throw new Error(sql);
+ if(sql.startsWith('INSERT INTO product_images')||sql.startsWith('DELETE i FROM product_images')){if(fail)throw new Error('Falha');return [{affectedRows:1}];}throw new Error(sql);
  }return {calls,execute,getConnection:async()=>({execute,beginTransaction:async()=>calls.push('begin'),commit:async()=>calls.push('commit'),rollback:async()=>calls.push('rollback'),release:()=>calls.push('release')})};}
 test('fotos: identifica PNG/JPEG/WebP pelos bytes e limita tamanho e dimensões',()=>{
  assert.equal(imageInfo(png).type,'image/png');assert.match(imageInfo(png).digest,/^[a-f0-9]{64}$/);
@@ -38,7 +38,7 @@ test('fotos: leitura pública usa bytes/MIME corretos, disponibilidade e revalid
  const missing=await serve(t,fake({missing:true}));assert.equal((await missing('/api/product-images/3')).status,404);
 });
 test('fotos: remover não apaga produto e consulta privada limita empresa',async t=>{
- const db=fake(),r=await serve(t,db);assert.equal((await r('/api/admin/products/3/image',{headers})).status,200);assert.deepEqual(db.calls.find(c=>c.sql?.startsWith('SELECT i.')).args,[3,7]);assert.equal((await r('/api/admin/products/3/image',{method:'DELETE',headers})).status,200);assert.deepEqual(db.calls.find(c=>c.sql?.startsWith('DELETE')).args,[3]);assert.equal(db.calls.some(c=>c.sql?.startsWith('DELETE FROM products')),false);
+ const db=fake(),r=await serve(t,db);assert.equal((await r('/api/admin/products/3/image',{headers})).status,200);assert.deepEqual(db.calls.find(c=>c.sql?.startsWith('SELECT i.')).args,[3,7]);assert.equal((await r('/api/admin/products/3/image',{method:'DELETE',headers})).status,200);assert.deepEqual(db.calls.find(c=>c.sql?.startsWith('DELETE')).args,[3,7]);assert.equal(db.calls.some(c=>c.sql?.startsWith('DELETE FROM products')),false);
 });
 test('preservação: fotografia BLOB é conferida por hash SQL sem carregar bytes no processo',async()=>{
  const calls=[];const db={query:async(sql)=>{calls.push(sql);return sql.includes('information_schema.STATISTICS')?[[{name:'product_id'}]]:[[{product_id:3,content:'digest-do-conteudo'}]];}};

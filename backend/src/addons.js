@@ -61,7 +61,7 @@ function installAddons(app, db, auth, manage) {
   app.get('/api/admin/products/:id/addons', auth, asyncRoute(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: 'Produto inválido.' });
-    const [rows] = await db.execute('SELECT p.id, p.name, a.config AS addon_config, a.version AS addon_version FROM products p LEFT JOIN product_addons a ON a.product_id = p.id WHERE p.id = ? AND p.company_id = ?', [id, req.user.company_id]);
+    const [rows] = await db.execute('SELECT p.id, p.name, a.config AS addon_config, a.version AS addon_version FROM products p LEFT JOIN product_addons a ON a.product_id = p.id WHERE p.id = ? AND p.company_id = ?', [id, req.tenantId]);
     if (!rows.length) return res.status(404).json({ error: 'Produto não encontrado nesta loja.' });
     res.json({ product: { id, name: rows[0].name }, groups: decodeGroups(rows[0].addon_config), version: Number(rows[0].addon_version || 0) });
   }));
@@ -73,7 +73,7 @@ function installAddons(app, db, auth, manage) {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
-      const [products] = await conn.execute('SELECT id FROM products WHERE id = ? AND company_id = ? FOR UPDATE', [id, req.user.company_id]);
+      const [products] = await conn.execute('SELECT id FROM products WHERE id = ? AND company_id = ? FOR UPDATE', [id, req.tenantId]);
       if (!products.length) { await conn.rollback(); return res.status(404).json({ error: 'Produto não encontrado nesta loja.' }); }
       const [rows] = await conn.execute('SELECT version FROM product_addons WHERE product_id = ? FOR UPDATE', [id]);
       if (Number(rows[0]?.version || 0) !== version) { await conn.rollback(); return res.status(409).json({ error: 'Outra edição foi salva. Recarregue os adicionais antes de editar.' }); }

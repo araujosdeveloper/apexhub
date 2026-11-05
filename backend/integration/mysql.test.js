@@ -34,7 +34,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
   for (const statement of sql.split(';').map(s => s.trim()).filter(Boolean)) await db.query(statement);
  }
  t.diagnostic('Esquema inicial e tabela de idempotência aplicados no MySQL real.');
- const request = await serve(t, db);
+ const request = await serve(t, db,{jwt:require('../test-support/jwt').testJwt()});
  const json = (method, body, cookie, key) => ({ method, headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(body) });
  async function register() {
   const slug = 'test-' + randomUUID();
@@ -133,6 +133,8 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  await require('./order-tracking').verifyOrderTracking(db,request,{a,b,json,orderId:orderA.order_id,originalUrl:orderA.tracking_url});
  await require('./reviews').verifyReviews(db,request,{a,b,json});
  await require('./dashboard').verifyDashboard(db,request,{a,b});
+ await require('./jwt-rbac').verifyJwtRbac(db,request,{a,b,json});
+ t.diagnostic('JWT/RBAC: emissão, claims, tenant, IDOR, perfis e revogação aprovados.');
  await require('./master').verifyMaster(db,request,{a,b,json});
  t.diagnostic('Master: autenticação exclusiva, busca, revisão, suspensão, sessões e auditoria aprovados.');
  t.diagnostic('ApexHub: indicadores, receita bruta, origem, busca e isolamento aprovados.');

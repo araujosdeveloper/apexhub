@@ -24,7 +24,7 @@ function installOrderTracking(app,db,auth){
  }));
  app.post('/api/admin/orders/:id/tracking',auth,asyncRoute(async(req,res)=>{
   const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'Pedido inválido.'});
-  const conn=await db.getConnection();try{await conn.beginTransaction();const [[order]]=await conn.execute('SELECT id FROM orders WHERE id=? AND company_id=? FOR UPDATE',[id,req.user.company_id]);if(!order){await conn.rollback();return res.status(404).json({error:'Pedido não encontrado nesta loja.'});}
+  const conn=await db.getConnection();try{await conn.beginTransaction();const [[order]]=await conn.execute('SELECT id FROM orders WHERE id=? AND company_id=? FOR UPDATE',[id,req.tenantId]);if(!order){await conn.rollback();return res.status(404).json({error:'Pedido não encontrado nesta loja.'});}
    const url=await ensureTracking(conn,id);await conn.commit();res.json({tracking_url:url});
   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
  }));

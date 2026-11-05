@@ -20,9 +20,9 @@ async function decorateMenu(db,companyId,products){
 }
 function installMerchandising(app,db,auth,manage){
  app.get('/api/admin/merchandising',auth,manage,asyncRoute(async(req,res)=>{
-  const data=await loadConfig(db,req.user.company_id);
-  const [products]=await db.execute('SELECT p.id,p.name,p.price,p.active,c.active AS category_active FROM products p JOIN categories c ON c.id=p.category_id AND c.company_id=p.company_id WHERE p.company_id=? ORDER BY p.name,p.id',[req.user.company_id]);
-  res.json({...data,products,company_id:req.user.company_id});
+  const data=await loadConfig(db,req.tenantId);
+  const [products]=await db.execute('SELECT p.id,p.name,p.price,p.active,c.active AS category_active FROM products p JOIN categories c ON c.id=p.category_id AND c.company_id=p.company_id WHERE p.company_id=? ORDER BY p.name,p.id',[req.tenantId]);
+  res.json({...data,products,company_id:req.tenantId});
  }));
  app.put('/api/admin/merchandising',auth,manage,asyncRoute(async(req,res)=>{
   let config;const version=req.body?.version;
@@ -30,12 +30,12 @@ function installMerchandising(app,db,auth,manage){
   const conn=await db.getConnection();
   try{
    await conn.beginTransaction();
-   const [[company]]=await conn.execute('SELECT id FROM companies WHERE id=? AND active=1 FOR UPDATE',[req.user.company_id]);if(!company){await conn.rollback();return res.status(404).json({error:'Loja indisponível.'});}
-   const current=await loadConfig(conn,req.user.company_id);if(current.version!==version){await conn.rollback();return res.status(409).json({error:'Outra edição foi salva. Recarregue antes de editar novamente.'});}
+   const [[company]]=await conn.execute('SELECT id FROM companies WHERE id=? AND active=1 FOR UPDATE',[req.tenantId]);if(!company){await conn.rollback();return res.status(404).json({error:'Loja indisponível.'});}
+   const current=await loadConfig(conn,req.tenantId);if(current.version!==version){await conn.rollback();return res.status(409).json({error:'Outra edição foi salva. Recarregue antes de editar novamente.'});}
    const ids=[...new Set(config.recommendations.flatMap(row=>[row.product_id,...row.related_ids]))];
-   if(ids.length){const [products]=await conn.execute(`SELECT id FROM products WHERE company_id=? AND id IN (${ids.map(()=>'?').join(',')})`,[req.user.company_id,...ids]);if(products.length!==ids.length){await conn.rollback();return res.status(400).json({error:'Todos os produtos das combinações devem pertencer a esta loja.'});}}
-   await conn.execute('INSERT INTO company_merchandising(company_id,config,version) VALUES (?,?,?) ON DUPLICATE KEY UPDATE config=VALUES(config),version=VALUES(version)',[req.user.company_id,JSON.stringify(config),version+1]);
-   await conn.commit();res.json({config,version:version+1,company_id:req.user.company_id});
+   if(ids.length){const [products]=await conn.execute(`SELECT id FROM products WHERE company_id=? AND id IN (${ids.map(()=>'?').join(',')})`,[req.tenantId,...ids]);if(products.length!==ids.length){await conn.rollback();return res.status(400).json({error:'Todos os produtos das combinações devem pertencer a esta loja.'});}}
+   await conn.execute('INSERT INTO company_merchandising(company_id,config,version) VALUES (?,?,?) ON DUPLICATE KEY UPDATE config=VALUES(config),version=VALUES(version)',[req.tenantId,JSON.stringify(config),version+1]);
+   await conn.commit();res.json({config,version:version+1,company_id:req.tenantId});
   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
  }));
 }

@@ -1,3 +1,4 @@
+const {requireRoles}=require('./middlewares/auth');
 const { asyncRoute } = require('./auth');
 const { utcDate } = require('./order-board');
 
@@ -77,11 +78,11 @@ async function readSnapshot(db, action) {
   catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
 }
 function installCustomers(app, db, auth) {
-  const permitted = (req,res,next) => ['owner','manager'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Seu perfil não permite consultar a base de clientes.' });
+  const permitted = requireRoles('tenant_owner','tenant_manager');
   app.get('/api/admin/customers', auth, permitted, asyncRoute(async (req,res) => {
     let selection;
     try { selection = filters(req.query); } catch (error) { return res.status(400).json({ error: error.message }); }
-    const now = new Date().toISOString(), args = [req.user.company_id,req.user.company_id,now.slice(0,19).replace('T',' ')];
+    const now = new Date().toISOString(), args = [req.tenantId,req.tenantId,now.slice(0,19).replace('T',' ')];
     const data = await readSnapshot(db, async conn => {
       const [[summary]] = await conn.execute(`${CRM} SELECT COUNT(*) AS contacts,
         COALESCE(SUM(CASE WHEN purchase_count >= 2 THEN 1 ELSE 0 END),0) AS repeat_contacts,
@@ -91,13 +92,13 @@ function installCustomers(app, db, auth) {
       const [rows] = await conn.execute(`${CRM} SELECT * FROM crm WHERE ${selection.where} ORDER BY ${selection.order} LIMIT ${selection.limit} OFFSET ${selection.offset}`, [...args,...selection.params]);
       return { customers: rows.map(customerView), total: Number(count.total), summary: { ...summary, contacts: Number(summary.contacts), repeat_contacts: Number(summary.repeat_contacts), inactive30: Number(summary.inactive30), unknown_value_orders: Number(summary.unknown_value_orders) } };
     });
-    res.json({ ...data, company_id: req.user.company_id, offset: selection.offset, limit: selection.limit, server_time: now });
+    res.json({ ...data, company_id: req.tenantId, offset: selection.offset, limit: selection.limit, server_time: now });
   }));
   app.get('/api/admin/customers/:id', auth, permitted, asyncRoute(async (req,res) => {
     const id = Number(req.params.id); let page;
     try { page = filters({ offset: req.query.offset, limit: req.query.limit }); if (!Number.isSafeInteger(id) || id < 1) throw new Error('Cliente inválido.'); }
     catch (error) { return res.status(400).json({ error: error.message }); }
-    const companyId = req.user.company_id, now = new Date().toISOString();
+    const companyId = req.tenantId, now = new Date().toISOString();
     const data = await readSnapshot(db, async conn => {
       const [anchors] = await conn.execute(`${MEMBERS} SELECT contact_key FROM members WHERE id = ?`, [companyId,id]);
       if (!anchors.length) return null;

@@ -1,3 +1,5 @@
+const {configuration}=require('./jwt');
+const {requireRoles}=require('./middlewares/auth');
 const { installMaster } = require('./master');
 const { installAppShell } = require('./app-shell');
 const { installDashboard } = require('./dashboard');
@@ -22,6 +24,7 @@ const { checkoutHash, reserveCheckout } = require('./checkout');
 const { loadOperations, availability, quoteDelivery, installOperations } = require('./operations');
 function createApp(db, options = {}) {
   const app = express();
+  app.locals.jwt=options.jwt===undefined?configuration():options.jwt;
   const orderEvents = options.orderEvents || createOrderEvents();
   app.locals.orderEvents = orderEvents;
   app.disable('x-powered-by');
@@ -40,6 +43,8 @@ function createApp(db, options = {}) {
     next();
   });
   const auth = installAuth(app, db, options);
+  // Toda rota administrativa, inclusive novas rotas, exige identidade e tenant.
+  app.use('/api/admin',auth);
   installMaster(app, db, options);
   app.get('/api/health', asyncRoute(async (req, res) => {
     await db.execute('SELECT 1');
@@ -56,10 +61,7 @@ function createApp(db, options = {}) {
     const menu = await decorateMenu(db, company.id, products.map(product => withImage(publicProduct(product))));
     res.json({ company, categories, ...menu, operations: availability(await loadOperations(db, company.id)) });
   }));
-  const manage = (req, res, next) => {
-    if (!['owner', 'manager'].includes(req.user.role)) return res.status(403).json({ error: 'Seu perfil não permite gerenciar o cardápio.' });
-    next();
-  };
+  const manage = requireRoles('tenant_owner','tenant_manager');
   installCatalogEditing(app, db, auth, manage);
   installProductImages(app, db, auth, manage);
   installMerchandising(app, db, auth, manage);
@@ -75,51 +77,51 @@ function createApp(db, options = {}) {
   installTeam(app, db, auth);
   installDrivers(app, db, auth, orderEvents);
   app.get('/api/admin/catalog', auth, asyncRoute(async (req, res) => {
-    const [categories] = await db.execute('SELECT id, name, sort_order, active FROM categories WHERE company_id = ? ORDER BY sort_order, id', [req.user.company_id]);
-    const [products] = await db.execute('SELECT p.id,p.category_id,p.name,p.description,p.price,p.active,i.digest AS image_digest FROM products p LEFT JOIN product_images i ON i.product_id=p.id WHERE p.company_id = ? ORDER BY p.id DESC', [req.user.company_id]);
+    const [categories] = await db.execute('SELECT id, name, sort_order, active FROM categories WHERE company_id = ? ORDER BY sort_order, id', [req.tenantId]);
+    const [products] = await db.execute('SELECT p.id,p.category_id,p.name,p.description,p.price,p.active,i.digest AS image_digest FROM products p LEFT JOIN product_images i ON i.product_id=p.id WHERE p.company_id = ? ORDER BY p.id DESC', [req.tenantId]);
     res.json({ categories, products: products.map(product => withImage(product,true)) });
   }));
   app.post('/api/admin/categories', auth, manage, asyncRoute(async (req, res) => {
     const name = req.body?.name;
     if (typeof name !== 'string' || !name.trim() || name.length > 120) return res.status(400).json({ error: 'Informe uma categoria de até 120 caracteres.' });
-    const [result] = await db.execute('INSERT INTO categories (company_id, name) VALUES (?, ?)', [req.user.company_id, name.trim()]);
+    const [result] = await db.execute('INSERT INTO categories (company_id, name) VALUES (?, ?)', [req.tenantId, name.trim()]);
     res.status(201).json({ id: result.insertId });
   }));
   app.post('/api/admin/products', auth, manage, asyncRoute(async (req, res) => {
     const { name, description = '', category_id, price } = req.body || {};
     if (typeof name !== 'string' || !name.trim() || name.length > 160 || typeof description !== 'string' || description.length > 4000 ||
         !Number.isSafeInteger(category_id) || category_id < 1 || typeof price !== 'string' || !/^\d{1,6}(\.\d{1,2})?$/.test(price)) return res.status(400).json({ error: 'Confira nome, categoria e preço (ex.: 25.90).' });
-    const [categories] = await db.execute('SELECT id FROM categories WHERE id = ? AND company_id = ? AND active = 1', [category_id, req.user.company_id]);
+    const [categories] = await db.execute('SELECT id FROM categories WHERE id = ? AND company_id = ? AND active = 1', [category_id, req.tenantId]);
     if (!categories.length) return res.status(400).json({ error: 'Categoria indisponível.' });
-    const [result] = await db.execute('INSERT INTO products (company_id, category_id, name, description, price) VALUES (?, ?, ?, ?, ?)', [req.user.company_id, category_id, name.trim(), description.trim(), price]);
+    const [result] = await db.execute('INSERT INTO products (company_id, category_id, name, description, price) VALUES (?, ?, ?, ?, ?)', [req.tenantId, category_id, name.trim(), description.trim(), price]);
     res.status(201).json({ id: result.insertId });
   }));
   app.patch('/api/admin/products/:id/availability', auth, manage, asyncRoute(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1 || typeof req.body?.active !== 'boolean') return res.status(400).json({ error: 'Dados inválidos.' });
-    const [result] = await db.execute('UPDATE products SET active = ? WHERE id = ? AND company_id = ?', [req.body.active, id, req.user.company_id]);
+    const [result] = await db.execute('UPDATE products SET active = ? WHERE id = ? AND company_id = ?', [req.body.active, id, req.tenantId]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Produto não encontrado.' });
     res.json({ success: true });
   }));
   app.patch('/api/admin/settings', auth, manage, asyncRoute(async (req, res) => {
     const { whatsapp_phone } = req.body || {};
     if (typeof whatsapp_phone !== 'string' || (whatsapp_phone !== '' && !/^\d{10,15}$/.test(whatsapp_phone))) return res.status(400).json({ error: 'Informe o WhatsApp com código do país e apenas números.' });
-    await db.execute('UPDATE companies SET whatsapp_phone = ? WHERE id = ?', [whatsapp_phone, req.user.company_id]);
+    await db.execute('UPDATE companies SET whatsapp_phone = ? WHERE id = ?', [whatsapp_phone, req.tenantId]);
     res.json({ success: true });
   }));
   app.get('/api/admin/subscription', auth, asyncRoute(async (req, res) => {
-    const [rows] = await db.execute('SELECT plan_code, status, trial_ends_at FROM subscriptions WHERE company_id = ?', [req.user.company_id]);
+    const [rows] = await db.execute('SELECT plan_code, status, trial_ends_at FROM subscriptions WHERE company_id = ?', [req.tenantId]);
     res.json({ subscription: rows[0] || null });
   }));
   app.get('/api/admin/orders', auth, asyncRoute(async (req, res) => {
     const [orders] = await db.execute(`SELECT id, total_amount, status, payment_method, notes, created_at, snapshot_source,
       customer_name, customer_phone, address_street, address_number, address_neighborhood,
       fulfillment_method, delivery_fee, fulfillment_address, estimated_minutes, coupon_code, discount_amount, coupon_snapshot
-      FROM orders WHERE company_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`, [req.user.company_id]);
+      FROM orders WHERE company_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`, [req.tenantId]);
     if (!orders.length) return res.json([]);
     const [items] = await db.execute(`SELECT oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
-      WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')})`, [req.user.company_id, ...orders.map(o => o.id)]);
+      WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')})`, [req.tenantId, ...orders.map(o => o.id)]);
     res.json(orders.map(order => ({ ...order, items: items.filter(i => i.order_id === order.id) })));
   }));
   app.patch('/api/admin/orders/:id/status', auth, asyncRoute(async (req, res) => {
@@ -129,12 +131,12 @@ function createApp(db, options = {}) {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1 || !['preparing', 'ready', 'delivering', 'completed', 'cancelled'].includes(status) || (expected !== undefined && !['pending','preparing','ready','delivering','completed','cancelled'].includes(expected))) return res.status(400).json({ error: 'Pedido ou status inválido.' });
     const allowed = Object.keys(transitions).filter(key => transitions[key].includes(status));
-    const [result] = await db.execute(`UPDATE orders SET status = ? WHERE id = ? AND company_id = ? AND status IN (${allowed.map(() => '?').join(',')})${status === 'delivering' ? " AND fulfillment_method = 'delivery'" : ''}${expected !== undefined ? ' AND status = ?' : ''}`, [status, id, req.user.company_id, ...allowed, ...(expected !== undefined ? [expected] : [])]);
+    const [result] = await db.execute(`UPDATE orders SET status = ? WHERE id = ? AND company_id = ? AND status IN (${allowed.map(() => '?').join(',')})${status === 'delivering' ? " AND fulfillment_method = 'delivery'" : ''}${expected !== undefined ? ' AND status = ?' : ''}`, [status, id, req.tenantId, ...allowed, ...(expected !== undefined ? [expected] : [])]);
     if (!result.affectedRows) {
-      const [rows] = await db.execute('SELECT id FROM orders WHERE id = ? AND company_id = ?', [id, req.user.company_id]);
+      const [rows] = await db.execute('SELECT id FROM orders WHERE id = ? AND company_id = ?', [id, req.tenantId]);
       return res.status(rows.length ? 409 : 404).json({ error: rows.length ? 'Transição de status não permitida. Atualize o painel.' : 'Pedido não encontrado.' });
     }
-    orderEvents.publish(req.user.company_id);
+    orderEvents.publish(req.tenantId);
     res.json({ success: true });
   }));
   app.post('/api/orders', asyncRoute(async (req, res) => {

@@ -78,6 +78,7 @@ finish() {
 trap finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+node scripts/ensure-jwt-keys.js
 printf 'Preparando imagem e banco persistente NOVO: %s\n' "$release_project"
 "${compose[@]}" config --quiet
 "${compose[@]}" build prepare app

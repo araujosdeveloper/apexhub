@@ -8,7 +8,7 @@ function createOrderEvents({ maxPerCompany = 20, interval = setInterval, clear =
   function stream(db) {
     return (req, res) => {
       if (stopped) return res.status(503).json({ error: 'Aplicação reiniciando. A atualização periódica tentará novamente.' });
-      const companyId = req.user.company_id;
+      const companyId = req.tenantId;
       const clients = subscribers.get(companyId) || new Set();
       if (clients.size >= maxPerCompany) return res.status(429).json({ error: 'Limite de telas ao vivo atingido. A atualização periódica continua disponível.' });
       let closed = false, checking = false, timer;

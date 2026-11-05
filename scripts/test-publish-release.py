@@ -57,6 +57,7 @@ class PublicationRecovery(unittest.TestCase):
             (root / 'bin').mkdir()
             (root / 'deploy/public-edge/routes').mkdir(parents=True)
             shutil.copy(ROOT / 'scripts/publish-release.sh', root / 'scripts')
+            shutil.copy(ROOT / 'scripts/ensure-jwt-keys.js', root / 'scripts')
             (root / 'deploy/public-edge/Caddyfile').write_text('fixture only\n')
             route = root / 'deploy/public-edge/routes/active.caddy'
             route.write_text('respond "A loja está sendo preparada" 503\n')

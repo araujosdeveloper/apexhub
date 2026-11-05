@@ -28,9 +28,9 @@ function installOrderBoard(app, db, auth, events) {
   app.get('/api/admin/orders/events', auth, events.stream(db));
   app.get('/api/admin/orders/board', auth, asyncRoute(async (req, res) => {
     let filter;
-    try { filter = boardFilter(req.query, req.user.company_id); }
+    try { filter = boardFilter(req.query, req.tenantId); }
     catch (error) { return res.status(400).json({ error: error.message }); }
-    const [summary] = await db.execute('SELECT status, COUNT(*) AS count, MAX(id) AS latest_id FROM orders WHERE company_id = ? GROUP BY status', [req.user.company_id]);
+    const [summary] = await db.execute('SELECT status, COUNT(*) AS count, MAX(id) AS latest_id FROM orders WHERE company_id = ? GROUP BY status', [req.tenantId]);
     const counts = Object.fromEntries([...SCOPES.active, ...SCOPES.history].map(status => [status, 0]));
     for (const row of summary) if (Object.hasOwn(counts, row.status)) counts[row.status] = Number(row.count);
     const latestPendingId = Number(summary.find(row => row.status === 'pending')?.latest_id || 0);
@@ -44,9 +44,9 @@ function installOrderBoard(app, db, auth, events) {
     let items = [];
     if (orders.length) {
       [items] = await db.execute(`SELECT oi.id, oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot
-        FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')}) ORDER BY oi.id`, [req.user.company_id, ...orders.map(order => order.id)]);
+        FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')}) ORDER BY oi.id`, [req.tenantId, ...orders.map(order => order.id)]);
     }
-    res.json({ company_id: req.user.company_id, orders: orders.map(order => { const {tracking_token,...data}=order;return { ...data, tracking_url:typeof tracking_token==='string'&&/^[a-f0-9]{64}$/.test(tracking_token)?'/track.html#'+tracking_token:null, created_at: utcDate(order.created_at), items: items.filter(item => item.order_id === order.id) }; }),
+    res.json({ company_id: req.tenantId, orders: orders.map(order => { const {tracking_token,...data}=order;return { ...data, tracking_url:typeof tracking_token==='string'&&/^[a-f0-9]{64}$/.test(tracking_token)?'/track.html#'+tracking_token:null, created_at: utcDate(order.created_at), items: items.filter(item => item.order_id === order.id) }; }),
       counts, latest_pending_id: latestPendingId, total: Number(total.total), offset: filter.offset, limit: filter.limit, server_time: new Date().toISOString() });
   }));
 }

@@ -1,3 +1,4 @@
+const {requireRoles}=require('./middlewares/auth');
 const {asyncRoute}=require('./auth');
 const {loadOperations}=require('./operations');
 const DAY=86400000;
@@ -35,12 +36,12 @@ const METRICS=`COUNT(*) AS orders,
  ROUND(AVG(CASE WHEN status='completed' AND total_amount>=0 THEN total_amount ELSE NULL END),2) AS average_order`;
 function counts(row){const result={...row};for(const key of ['orders','completed','cancelled','active','valued_orders','unknown_values','unknown_charges','quantity','order_count','incomplete_orders'])if(key in result)result[key]=Number(result[key]||0);return result;}
 function installReports(app,db,auth){
- app.get('/api/admin/reports/sales',auth,(req,res,next)=>['owner','manager'].includes(req.user.role)?next():res.status(403).json({error:'Seu perfil não permite consultar relatórios de vendas.'}),asyncRoute(async(req,res)=>{
+ app.get('/api/admin/reports/sales',auth,requireRoles('tenant_owner','tenant_manager'),asyncRoute(async(req,res)=>{
   const conn=await db.getConnection();
   try{
-   await conn.beginTransaction();const config=await loadOperations(conn,req.user.company_id);let period;
+   await conn.beginTransaction();const config=await loadOperations(conn,req.tenantId);let period;
    try{period=reportPeriod(req.query,config.timezone);}catch(e){await conn.rollback();return res.status(400).json({error:e.message});}
-   const args=[req.user.company_id,period.from,period.until];
+   const args=[req.tenantId,period.from,period.until];
    const base=`WITH sales AS (SELECT id,status,total_amount,delivery_fee,discount_amount,payment_method,fulfillment_method,created_at FROM orders WHERE company_id=? AND created_at>=? AND created_at<?)`;
    const [[summary]]=await conn.execute(`${base} SELECT ${METRICS} FROM sales`,args);
    const [payments]=await conn.execute(`${base} SELECT COALESCE(NULLIF(TRIM(payment_method),''),'Não informado') AS label,${METRICS} FROM sales WHERE status='completed' GROUP BY label ORDER BY total DESC,label`,args);
@@ -57,7 +58,7 @@ function installReports(app,db,auth){
     FROM order_items oi JOIN sales s ON s.id=oi.order_id WHERE s.status='completed' GROUP BY oi.product_id,oi.product_name ORDER BY quantity DESC,gross_total DESC,oi.product_name,oi.product_id LIMIT 20`,args);
    const [[legacy]]=await conn.execute(`${base} SELECT COUNT(*) AS incomplete_orders FROM sales s WHERE s.status='completed' AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id=s.id)`,args);
    await conn.commit();
-   res.json({company_id:req.user.company_id,timezone:config.timezone,start:period.start,end:period.end,server_time:new Date().toISOString(),basis:'created_at_current_status',summary:{...counts(summary),...counts(legacy)},payments:payments.map(counts),fulfillment:fulfillment.map(counts),daily:daily.map(counts),products:products.map(counts)});
+   res.json({company_id:req.tenantId,timezone:config.timezone,start:period.start,end:period.end,server_time:new Date().toISOString(),basis:'created_at_current_status',summary:{...counts(summary),...counts(legacy)},payments:payments.map(counts),fulfillment:fulfillment.map(counts),daily:daily.map(counts),products:products.map(counts)});
   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
  }));
 }

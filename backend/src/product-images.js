@@ -34,18 +34,18 @@ function installProductImages(app,db,auth,manage){
   if(!image)return res.status(404).json({error:'Imagem indisponível.'});sendImage(req,res,image);
  }));
  app.get('/api/admin/products/:id/image',auth,manage,idCheck,asyncRoute(async(req,res)=>{
-  const [[image]]=await db.execute('SELECT i.content_type,i.content,i.digest FROM product_images i JOIN products p ON p.id=i.product_id WHERE p.id=? AND p.company_id=?',[req.productId,req.user.company_id]);
+  const [[image]]=await db.execute('SELECT i.content_type,i.content,i.digest FROM product_images i JOIN products p ON p.id=i.product_id WHERE p.id=? AND p.company_id=?',[req.productId,req.tenantId]);
   if(!image)return res.status(404).json({error:'Imagem não encontrada nesta loja.'});sendImage(req,res,image,true);
  }));
  app.put('/api/admin/products/:id/image',auth,manage,idCheck,express.raw({type:['image/jpeg','image/png','image/webp'],limit:MAX_BYTES}),asyncRoute(async(req,res)=>{
   let info;try{info=imageInfo(req.body);if(req.get('content-type')?.split(';')[0]!==info.type)throw new Error('O formato do arquivo não corresponde à imagem.');}catch(e){return res.status(400).json({error:e.message});}
-  const conn=await db.getConnection();try{await conn.beginTransaction();const [[product]]=await conn.execute('SELECT id FROM products WHERE id=? AND company_id=? FOR UPDATE',[req.productId,req.user.company_id]);if(!product){await conn.rollback();return res.status(404).json({error:'Produto não encontrado nesta loja.'});}
+  const conn=await db.getConnection();try{await conn.beginTransaction();const [[product]]=await conn.execute('SELECT id FROM products WHERE id=? AND company_id=? FOR UPDATE',[req.productId,req.tenantId]);if(!product){await conn.rollback();return res.status(404).json({error:'Produto não encontrado nesta loja.'});}
    await conn.execute('INSERT INTO product_images(product_id,content_type,content,digest) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE content_type=VALUES(content_type),content=VALUES(content),digest=VALUES(digest)',[req.productId,info.type,req.body,info.digest]);await conn.commit();res.json({image_url:`/api/admin/products/${req.productId}/image?v=${info.digest}`});
   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
  }));
  app.delete('/api/admin/products/:id/image',auth,manage,idCheck,asyncRoute(async(req,res)=>{
-  const conn=await db.getConnection();try{await conn.beginTransaction();const [[product]]=await conn.execute('SELECT id FROM products WHERE id=? AND company_id=? FOR UPDATE',[req.productId,req.user.company_id]);if(!product){await conn.rollback();return res.status(404).json({error:'Produto não encontrado nesta loja.'});}
-   await conn.execute('DELETE FROM product_images WHERE product_id=?',[req.productId]);await conn.commit();res.json({image_url:null});
+  const conn=await db.getConnection();try{await conn.beginTransaction();const [[product]]=await conn.execute('SELECT id FROM products WHERE id=? AND company_id=? FOR UPDATE',[req.productId,req.tenantId]);if(!product){await conn.rollback();return res.status(404).json({error:'Produto não encontrado nesta loja.'});}
+   await conn.execute('DELETE i FROM product_images i JOIN products p ON p.id=i.product_id WHERE i.product_id=? AND p.company_id=?',[req.productId,req.tenantId]);await conn.commit();res.json({image_url:null});
   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
  }));
 }

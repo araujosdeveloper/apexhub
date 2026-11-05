@@ -1,3 +1,4 @@
+const {authenticate,tokenResponse,accessTokenFields}=require('./middlewares/auth');
 const {createHash}=require('node:crypto');
 const {asyncRoute}=require('./auth');
 const {verifyPassword,sessionToken,tokenHash}=require('./security');
@@ -8,8 +9,8 @@ function tenantRevision(row){return createHash('sha256').update(JSON.stringify([
 function tenantInput(body){if(!body||typeof body.name!=='string'||!body.name.trim()||body.name.trim().length>160||typeof body.active!=='boolean'||typeof body.revision!=='string'||!/^[a-f0-9]{64}$/.test(body.revision)||typeof body.reason!=='string'||body.reason.trim().length<5||body.reason.length>500)throw new Error('Informe nome, status, versão e motivo de 5 a 500 caracteres.');if(body.cnpj!==undefined&&body.cnpj!==null&&typeof body.cnpj!=='string')throw new Error('Identificador fiscal inválido.');const cnpj=typeof body.cnpj==='string'?body.cnpj.trim().toUpperCase().replace(/[.\/\s-]/g,''):null;if(cnpj&&!/^[A-Z0-9]{1,32}$/.test(cnpj))throw new Error('Informe um identificador fiscal com até 32 letras ou números.');return {cnpj:cnpj||null,name:body.name.trim(),active:body.active,reason:body.reason.trim(),revision:body.revision};}
 function installMaster(app,db,{secureCookies=false}={}){
  const cookieOptions={httpOnly:true,secure:secureCookies,sameSite:'strict',path:'/api/master',maxAge:8*3600000};
- const token=req=>(req.headers.cookie||'').split(';').map(value=>value.trim()).find(value=>value.startsWith(cookieName+'='))?.slice(cookieName.length+1);
- const auth=asyncRoute(async(req,res,next)=>{const value=token(req);if(!/^[a-f0-9]{64}$/.test(value||''))return res.status(401).json({error:'Entre com uma conta Master.'});const [[admin]]=await db.execute('SELECT a.id,a.name,a.email FROM platform_sessions s JOIN platform_admins a ON a.id=s.admin_id WHERE s.token_hash=? AND s.expires_at>UTC_TIMESTAMP() AND a.active=1',[tokenHash(value)]);if(!admin)return res.status(401).json({error:'Sessão Master expirada.'});req.master=admin;next();});
+ const auth=authenticate(db,'master',app.locals.jwt);
+ app.post('/api/master/auth/token',auth,(req,res)=>tokenResponse(req,res,app.locals.jwt));
  const attempts=new Map();
  app.post('/api/master/auth/login',asyncRoute(async(req,res)=>{
   const now=Date.now();for(const [ip,value]of attempts)if(value.until<now)attempts.delete(ip);const entry=attempts.get(req.ip)||{count:0,until:now+900000};entry.count++;attempts.set(req.ip,entry);if(entry.count>15)return res.status(429).json({error:'Muitas tentativas. Aguarde 15 minutos.'});
@@ -17,12 +18,13 @@ function installMaster(app,db,{secureCookies=false}={}){
   const [[admin]]=await db.execute('SELECT id,password_hash FROM platform_admins WHERE email=? AND active=1',[email.trim().toLowerCase()]);
   const valid=await verifyPassword(password,admin?.password_hash||`scrypt:00000000000000000000000000000000:${'0'.repeat(128)}`);
   if(!admin||!valid)return res.status(401).json({error:'Credenciais Master inválidas.'});
-  const conn=await db.getConnection();let raw;
-  try{await conn.beginTransaction();const [[current]]=await conn.execute('SELECT id,password_hash FROM platform_admins WHERE id=? AND active=1 FOR UPDATE',[admin.id]);if(!current||current.password_hash!==admin.password_hash){await conn.rollback();return res.status(401).json({error:'Credenciais Master inválidas.'});}raw=sessionToken();await conn.execute('INSERT INTO platform_sessions(token_hash,admin_id,expires_at) VALUES (?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 8 HOUR))',[tokenHash(raw),admin.id]);await conn.execute("INSERT INTO platform_audit(admin_id,action,entity_id,details) VALUES (?,'master_login',?,'{}')",[admin.id,String(admin.id)]);await conn.commit();}catch(e){await conn.rollback();throw e;}finally{conn.release();}
-  attempts.delete(req.ip);res.cookie(cookieName,raw,cookieOptions);res.json({ok:true});
+  const conn=await db.getConnection();let raw,access;
+  try{await conn.beginTransaction();const [[current]]=await conn.execute('SELECT id,password_hash FROM platform_admins WHERE id=? AND active=1 FOR UPDATE',[admin.id]);if(!current||current.password_hash!==admin.password_hash){await conn.rollback();return res.status(401).json({error:'Credenciais Master inválidas.'});}raw=sessionToken();await conn.execute('INSERT INTO platform_sessions(token_hash,admin_id,expires_at) VALUES (?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 8 HOUR))',[tokenHash(raw),admin.id]);await conn.execute("INSERT INTO platform_audit(admin_id,action,entity_id,details) VALUES (?,'master_login',?,'{}')",[admin.id,String(admin.id)]);access=accessTokenFields(app.locals.jwt,{scope:'master',id:admin.id,role:'super_admin',sid:tokenHash(raw)});await conn.commit();}catch(e){await conn.rollback();throw e;}finally{conn.release();}
+  attempts.delete(req.ip);res.cookie(cookieName,raw,cookieOptions);res.json({ok:true,...access});
  }));
+ app.use('/api/master',auth);
  app.get('/api/master/auth/me',auth,(req,res)=>res.json({admin:req.master,capabilities}));
- app.post('/api/master/auth/logout',auth,asyncRoute(async(req,res)=>{await db.execute('DELETE FROM platform_sessions WHERE token_hash=?',[tokenHash(token(req))]);res.clearCookie(cookieName,{...cookieOptions,maxAge:undefined});res.json({ok:true});}));
+ app.post('/api/master/auth/logout',auth,asyncRoute(async(req,res)=>{await db.execute('DELETE FROM platform_sessions WHERE token_hash=?',[req.auth.sid]);res.clearCookie(cookieName,{...cookieOptions,maxAge:undefined});res.json({ok:true});}));
  app.get('/api/master/overview',auth,asyncRoute(async(req,res)=>{
   const conn=await db.getConnection();try{await conn.beginTransaction();
    const [[stores]]=await conn.execute('SELECT COUNT(*) AS total,SUM(active=1) AS active FROM companies');

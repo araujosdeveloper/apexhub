@@ -71,6 +71,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+node scripts/ensure-jwt-keys.js
 public_get /api/health >/dev/null
 app_container="$(bash "$backup_release_dir/manage.sh" ps -q app)"
 mysql_container="$(bash "$backup_release_dir/manage.sh" ps -q mysql)"
@@ -191,5 +192,5 @@ public_get /master-login.js >/dev/null
 printf 'PUBLICADO\n' > "$update_dir/STATUS.txt"
 printf '%s\n' "$update_dir" > deploy/latest-update.path
 completed=true
-printf '\nATUALIZAÇÃO PUBLICADA: painel Master ApexHub e módulos anteriores.\n'
+printf '\nATUALIZAÇÃO PUBLICADA: JWT, RBAC e isolamento multi-tenant ApexHub.\n'
 printf 'Painel: https://179.198.120.188/login.html\nMaster: https://179.198.120.188/master-login.html\nBackup final: %s\nRelatório: %s\n' "$final_backup" "$update_dir"
