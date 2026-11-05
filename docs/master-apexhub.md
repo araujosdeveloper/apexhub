@@ -49,3 +49,25 @@ Rotas `/api/master/*` usam somente a sessão Master, com token aleatório armaze
 246 testes locais aprovados, sintaxe backend/frontend válida e seis simulações do atualizador aprovadas. Compose validado sem imprimir configuração/segredos. Novos testes cobrem isolamento de cookies, hashes, integrações nulas, busca, paginação, revisão, suspensão, reativação, rollback/auditoria, identificador duplicado e provisionamento.
 
 Integração MySQL real, ensaio de migração para INT/INT UNSIGNED e smoke da cópia aprovados pelo atualizador no host em 05/11/2026 às 18:06 UTC, com backup, preservação dos dados e verificações HTTP dos novos endpoints/assets. Não houve teste visual em navegador nesta sessão. Após publicação: conferir desktop/celular, criar conta Master, verificar isolamento de contas e experimentar edição/suspensão somente numa loja de teste.
+
+## Ajuste da criação no terminal — 05/11/2026
+
+Após relato de travamento, `scripts/create-master.sh` passou a solicitar os dados diretamente no terminal do host, com Bash `read`, senha oculta e restauração do terminal ao cancelar. Docker usa `exec -T` e recebe JSON por stdin, sem senha em argumentos, variáveis exportadas ou arquivos temporários. Usa o módulo de provisionamento já publicado; não exige rebuild/republicação. A causa do travamento original não foi confirmada por mensagem de erro do host.
+
+Quatro testes com PTY e Docker/banco simulados aprovados: criação, entrada oculta, confirmação divergente, senha curta e cancelamento. A criação de uma conta real pelo responsável continua sem confirmação. `bash scripts/check-master.sh` oferece diagnóstico somente de leitura, mostrando se o terminal é interativo e a contagem de contas/contas ativas, sem mostrar e-mails, hashes, senhas ou tokens.
+
+## Recuperação de credenciais pelo terminal
+
+Para o erro `Credenciais Master inválidas.`, quando a conta já existe e a senha não é aceita:
+
+```bash
+bash /root/delivery-saas/scripts/recover-master.sh
+```
+
+Informar o e-mail Master e uma nova senha de 16 a 128 caracteres, repetida para confirmação. A senha não aparece ao digitar. O comando exige terminal interativo e acesso ao container publicado identificado por ponteiro/rota. Usa Docker sem TTY; dados e programa são transmitidos por stdin, sem credenciais em argumentos, ambiente exportado ou arquivos temporários. Usa o código de recuperação do host e módulos de segurança já disponíveis na imagem; não exige republicação.
+
+Atualiza somente a conta Master existente do e-mail informado: senha scrypt, reativação, revogação das sessões e auditoria `master_access_recovered`, numa transação. Confere o hash gravado antes de concluir. Não cria conta, não eleva lojista e não modifica empresas ou usuários de lojas. Conta inexistente, falha de auditoria ou verificação divergente revertem a operação. Não há endpoint HTTP de recuperação pública.
+
+A mensagem de sucesso é `SENHA MASTER REDEFINIDA E VERIFICADA.` seguida do ID. Voltar a `/master-login.html` e usar os dados informados. Se não existir conta Master para o e-mail, o comando informa o problema sem alterar outro cadastro; usar criação de conta quando apropriado. A limitação de tentativas do login não é desabilitada pelo script.
+
+269 testes backend e quatro testes de terminal aprovados após a preparação desta correção. A recuperação de uma conta real ainda depende da execução pelo responsável no host, pois o Docker desta sessão não permite acesso.
