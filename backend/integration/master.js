@@ -10,6 +10,7 @@ async function verifyMaster(db,request,{a,b,json}){
   const masterAccess=(await login.json()).access_token;assert.ok(masterAccess);const bearer={Authorization:'Bearer '+masterAccess};
   assert.equal((await request('/api/master/overview',{headers:bearer})).status,200);
   assert.equal((await request('/api/admin/catalog',{headers:bearer})).status,401);
+  await require('./platform-admin').verifyPlatformAdmin(db,request,{bearer,a});
   const minted=await request('/api/auth/token',json('POST',{},b.cookie));assert.equal(minted.status,200);const tenantAccess=(await minted.json()).access_token;
   assert.equal((await request('/api/auth/me',{headers:{Cookie:cookie}})).status,401);
   const overview=await request('/api/master/overview',{headers:{Cookie:cookie}});assert.equal(overview.status,200);const data=await overview.json();assert.equal(data.mrr,null);assert.equal(data.uptime_percent,null);assert.equal(data.services.docker,null);assert.ok(data.stores.total>=1);
@@ -24,7 +25,7 @@ async function verifyMaster(db,request,{a,b,json}){
   assert.equal((await request('/api/master/tenants/'+b.id,json('PUT',{...body,active:true},cookie))).status,409);
   tenant=(await get(body.cnpj)).tenants.find(row=>row.id===b.id);assert.equal(tenant.active,false);
   assert.equal((await request('/api/master/tenants/'+b.id,json('PUT',{...body,active:true,revision:tenant.revision},cookie))).status,200);
-  const [[audit]]=await db.execute("SELECT COUNT(*) AS total FROM platform_audit WHERE admin_id=? AND action='tenant_suspended'",[admin.id]);assert.equal(Number(audit.total),1);
+  const [[audit]]=await db.execute("SELECT COUNT(*) AS total FROM platform_audit WHERE admin_id=? AND action='tenant_suspended' AND entity_id=?",[admin.id,String(b.id)]);assert.equal(Number(audit.total),1);
   assert.equal((await request('/api/master/auth/logout',json('POST',{},cookie))).status,200);
   assert.equal((await request('/api/master/overview',{headers:{Cookie:cookie}})).status,401);
   assert.equal((await request('/api/master/overview',{headers:bearer})).status,401);

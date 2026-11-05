@@ -192,5 +192,5 @@ public_get /master-login.js >/dev/null
 printf 'PUBLICADO\n' > "$update_dir/STATUS.txt"
 printf '%s\n' "$update_dir" > deploy/latest-update.path
 completed=true
-printf '\nATUALIZAÇÃO PUBLICADA: JWT, RBAC e isolamento multi-tenant ApexHub.\n'
+printf '\nATUALIZAÇÃO PUBLICADA: API Super Admin, empresas e métricas globais ApexHub.\n'
 printf 'Painel: https://179.198.120.188/login.html\nMaster: https://179.198.120.188/master-login.html\nBackup final: %s\nRelatório: %s\n' "$final_backup" "$update_dir"

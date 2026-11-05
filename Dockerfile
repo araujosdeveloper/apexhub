@@ -11,7 +11,7 @@ COPY backend/test-support ./test-support
 COPY --chown=node:node backend/test ./test
 COPY frontend /app/frontend
 COPY database /app/database
-COPY scripts/ensure-jwt-keys.js scripts/master-recovery-payload.js /app/scripts/
+COPY scripts/ensure-jwt-keys.js scripts/master-recovery-payload.js scripts/setup-master-auto.js /app/scripts/
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

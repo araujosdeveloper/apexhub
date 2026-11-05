@@ -137,6 +137,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  t.diagnostic('JWT/RBAC: emissão, claims, tenant, IDOR, perfis e revogação aprovados.');
  await require('./master').verifyMaster(db,request,{a,b,json});
  t.diagnostic('Master: autenticação exclusiva, busca, revisão, suspensão, sessões e auditoria aprovados.');
+ t.diagnostic('API Super Admin: cadastro transacional, paginação, status, revogação, métricas e restrição de perfil aprovados.');
  t.diagnostic('ApexHub: indicadores, receita bruta, origem, busca e isolamento aprovados.');
  t.diagnostic('Avaliações: conclusão, nota, idempotência, concorrência e isolamento aprovados.');
  t.diagnostic('Acompanhamento: checkout/reenvio, token privado, status, legado e isolamento aprovados.');

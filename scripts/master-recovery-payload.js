@@ -6,7 +6,8 @@ process.stdin.on('end',()=>{
  const values=data.toString('utf8').split('\0');
  if(values.length!==3||values[2]!==''){process.exitCode=2;return;}
  const [email,password]=values;
- if(email.length>254||!/^\S+@\S+\.\S+$/.test(email.trim())||password.length<16||password.length>128){console.error('Informe e-mail válido e senha de 16 a 128 caracteres. Nenhuma conta alterada.');process.exitCode=2;return;}
+ if(email.length>254||!/^\S+@\S+\.\S+$/.test(email.trim())){console.error('E-mail inválido. Informe somente o e-mail da conta Master. Nenhuma conta alterada.');process.exitCode=2;return;}
+ if(password.length<16||password.length>128){console.error('Senha recusada: tamanho recebido '+password.length+'. Use de 16 a 128 caracteres. Nenhuma conta alterada.');process.exitCode=2;return;}
  // Função controlada do próprio projeto e entradas escapadas com JSON.stringify.
  // O container já tem security/mysql2; não é necessário rebuild da imagem.
  const program=`const mysql=require('mysql2/promise');

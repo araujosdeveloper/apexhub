@@ -1,3 +1,5 @@
+const {platformAdminRouter}=require('./routes/platform-admin');
+const {isPlatformAdminPath,responseEnvelope}=require('./platform-admin-http');
 const {configuration}=require('./jwt');
 const {requireRoles}=require('./middlewares/auth');
 const { installMaster } = require('./master');
@@ -28,6 +30,7 @@ function createApp(db, options = {}) {
   const orderEvents = options.orderEvents || createOrderEvents();
   app.locals.orderEvents = orderEvents;
   app.disable('x-powered-by');
+  app.use((req,res,next)=>isPlatformAdminPath(req.path)?responseEnvelope(req,res,next):next());
   app.use(express.json({ limit: '64kb' }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -37,13 +40,14 @@ function createApp(db, options = {}) {
     // Requisições de escrita do navegador devem ser da mesma origem.
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers.origin) {
       let origin;
-      try { origin = new URL(req.headers.origin); } catch { return res.sendStatus(403); }
+      try { origin = new URL(req.headers.origin); } catch { return res.status(403).json({error:'Origem não permitida.'}); }
       if (origin.host !== req.get('host')) return res.status(403).json({ error: 'Origem não permitida.' });
     }
     next();
   });
   const auth = installAuth(app, db, options);
-  // Toda rota administrativa, inclusive novas rotas, exige identidade e tenant.
+  app.use('/api/admin',platformAdminRouter(db,{jwt:app.locals.jwt,prices:options.planPrices,logger:options.logger||console}));
+  // Demais rotas administrativas exigem identidade e tenant.
   app.use('/api/admin',auth);
   installMaster(app, db, options);
   app.get('/api/health', asyncRoute(async (req, res) => {

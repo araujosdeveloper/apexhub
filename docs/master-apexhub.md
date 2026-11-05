@@ -71,3 +71,11 @@ Atualiza somente a conta Master existente do e-mail informado: senha scrypt, rea
 A mensagem de sucesso é `SENHA MASTER REDEFINIDA E VERIFICADA.` seguida do ID. Voltar a `/master-login.html` e usar os dados informados. Se não existir conta Master para o e-mail, o comando informa o problema sem alterar outro cadastro; usar criação de conta quando apropriado. A limitação de tentativas do login não é desabilitada pelo script.
 
 269 testes backend e quatro testes de terminal aprovados após a preparação desta correção. A recuperação de uma conta real ainda depende da execução pelo responsável no host, pois o Docker desta sessão não permite acesso.
+
+## Configuração automática solicitada pelo responsável
+
+`scripts/setup-master-auto.sh` configura o e-mail Master indicado pelo responsável (`araujosdeveloper@gmail.com`), criando a conta se não existir ou recuperando apenas ela se já existir. Gera uma senha aleatória de 32 caracteres com crypto.randomBytes, verifica a senha gravada e só então exibe as credenciais no terminal. Não exige digitação de senha nem rebuild da imagem.
+
+A senha fica em memória/stdin durante a operação; uma cópia é salva após sucesso em `reports/master-access-*/credentials.txt`, diretório 700 e arquivo 600, ignorados pelo Git. Novas execuções geram outra senha para essa conta. O processo não altera lojistas nem chaves JWT. Sete testes de configuração automática e recuperação aprovados. A tentativa de execução nesta sessão terminou bloqueada pelo socket Docker, antes de gerar senha ou alterar qualquer conta; execução real permanece pendente no host.
+
+O responsável confirmou que o acesso Master passou a funcionar após a configuração automática. A API inicial Super Admin está documentada em [api-super-admin.md](api-super-admin.md); seus novos recursos não alteram o login existente nem acrescentam formulários à interface atual.

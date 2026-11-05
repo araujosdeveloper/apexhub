@@ -36,6 +36,8 @@ services:
     env_file:
       - path: .env.jwt
         required: false
+      - path: .env.plans
+        required: false
     build: .
     restart: unless-stopped
     environment:
