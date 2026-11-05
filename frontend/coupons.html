@@ -1,0 +1,70 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cupons e promoções</title><link rel="stylesheet" href="/orders.css">
+<style>main{max-width:1100px;margin:auto}.panel{background:white;border:1px solid var(--border);border-radius:12px;padding:24px;margin:22px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}label{display:block;font-size:14px;color:#506079}input,select{display:block;width:100%;margin-top:6px;padding:11px;border:1px solid var(--border);border-radius:7px;background:white;color:#172139}input[type=checkbox]{width:auto;display:inline-block;margin-right:7px}.check{padding-top:12px}.form-actions{display:flex;gap:12px;margin-top:20px}table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}th,td{padding:14px 10px;border-bottom:1px solid var(--border);vertical-align:top}small{display:block;color:#718096;margin-top:5px}.table-wrap{overflow:auto}.tag{font-size:12px;color:#506079}#message{min-height:22px}@media(max-width:650px){.form-grid{grid-template-columns:1fr}.panel{padding:18px}}</style>
+<link rel="stylesheet" href="/admin-theme.css" media="screen"><script src="/frame-bridge.js"></script></head><body class="apex-view apex-view-coupons"><main><a href="/admin.html">← Voltar aos pedidos</a><h1>Cupons e promoções</h1><p class="muted">Crie descontos para sua loja. O cliente pode aplicar um cupom por pedido.</p><p id="message" role="status" aria-live="polite"></p>
+<section class="panel"><h2 id="form-title">Novo cupom</h2><form id="coupon-form"><fieldset id="fields" disabled style="border:0;padding:0"><div class="form-grid">
+<label>Código<input id="code" required maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,31}" placeholder="BEMVINDO10"><small>De 3 a 32 caracteres. O código não muda após criar.</small></label>
+<label>Tipo<select id="kind"><option value="fixed">Desconto em reais</option><option value="percent">Desconto percentual</option><option value="free_delivery">Frete grátis</option></select></label>
+<label id="value-label">Valor do desconto<input id="value" type="number" min="0.01" max="9999999.99" step="0.01" value="10.00" required></label>
+<label>Pedido mínimo em produtos (R$)<input id="minimum" type="number" min="0" max="9999999.99" step="0.01" value="0.00" required></label>
+<label>Teto do desconto (R$, opcional)<input id="maximum" type="number" min="0.01" max="9999999.99" step="0.01" placeholder="Sem teto"></label>
+<label>Limite total de usos (opcional)<input id="total-limit" type="number" min="1" max="1000000" step="1" placeholder="Sem limite"></label>
+<label>Limite por telefone (opcional)<input id="customer-limit" type="number" min="1" max="1000000" step="1" placeholder="Sem limite"></label>
+<label>Válido a partir de (opcional)<input id="starts" type="datetime-local"></label><label>Válido até (opcional)<input id="ends" type="datetime-local"></label>
+<div><label class="check"><input id="active" type="checkbox" checked>Cupom ativo</label><label class="check"><input id="first-purchase" type="checkbox">Somente primeira compra do telefone</label></div>
+</div><p id="timezone" class="muted"></p><p class="muted">O mínimo considera produtos e adicionais, sem frete. Pedidos cancelados continuam contando nos limites de uso. Primeira compra é conferida pelo telefone brasileiro informado, com DDD.</p><div class="form-actions"><button id="save">Criar cupom</button><button id="reset" class="secondary" type="button">Limpar / novo cupom</button></div></fieldset></form></section>
+<section class="panel"><div class="page-heading"><h2>Cupons da loja</h2><button id="refresh" class="secondary" type="button">Atualizar lista</button></div><div class="table-wrap"><table><thead><tr><th>Código</th><th>Benefício</th><th>Disponibilidade</th><th>Usos</th><th>Ação</th></tr></thead><tbody id="coupons"></tbody></table></div><p id="empty" class="muted" hidden>Nenhum cupom cadastrado.</p><div class="pagination"><button id="previous" class="secondary" type="button">Anterior</button><span id="page">Página 1</span><button id="next" class="secondary" type="button">Próxima</button></div></section></main>
+<script>
+const $ = id => document.getElementById(id);
+let editing = null, offset = 0, total = 0, canManage = false;
+const cash = value => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+function show(message) { $('message').textContent = message; }
+async function api(url, method = 'GET', body) {
+ const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+ if (response.status === 401) { location.replace('/login.html'); throw new Error('Entre na sua conta.'); }
+ const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Não foi possível concluir.'); return data;
+}
+function updateKind() {
+ const free = $('kind').value === 'free_delivery'; $('value').disabled = free; $('maximum').disabled = free;
+ $('value').max = $('kind').value === 'percent' ? '100' : '9999999.99'; $('value').min = free ? '0' : '0.01';
+ if (free) { $('value').value = '0.00'; $('maximum').value = ''; }
+}
+function reset() { editing = null; $('coupon-form').reset(); $('code').readOnly = false; $('form-title').textContent = 'Novo cupom'; $('save').textContent = 'Criar cupom'; updateKind(); }
+function localDate(value) {
+ if (!value) return '';
+ const date = new Date(value); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0,16);
+}
+function edit(coupon) {
+ editing = coupon; $('code').value = coupon.code; $('code').readOnly = true;
+ const config = coupon.config; $('kind').value = config.kind; $('value').value = config.value; $('minimum').value = config.min_subtotal; $('maximum').value = config.max_discount || '';
+ $('total-limit').value = config.total_limit ?? ''; $('customer-limit').value = config.per_customer_limit ?? ''; $('starts').value = localDate(config.starts_at); $('ends').value = localDate(config.ends_at);
+ $('active').checked = config.active; $('first-purchase').checked = config.first_purchase; updateKind(); $('form-title').textContent = 'Editar ' + coupon.code; $('save').textContent = 'Salvar alterações'; $('code').focus();
+}
+async function load() {
+ const data = await api('/api/admin/coupons?offset=' + offset); total = data.total;
+ if (total && offset >= total) { offset = Math.floor((total - 1) / 50) * 50; return load(); }
+ $('coupons').replaceChildren(); $('empty').hidden = data.coupons.length !== 0;
+ const now = Date.parse(data.server_time);
+ for (const coupon of data.coupons) {
+  const config = coupon.config, row = document.createElement('tr');
+  const benefit = config.kind === 'free_delivery' ? 'Frete grátis' : config.kind === 'percent' ? config.value.replace('.', ',') + '%' : cash(config.value);
+  const availability = !config.active ? 'Pausado' : config.ends_at && now >= Date.parse(config.ends_at) ? 'Expirado' : config.starts_at && now < Date.parse(config.starts_at) ? 'Agendado' : config.total_limit !== null && coupon.usage_count >= config.total_limit ? 'Esgotado' : 'Ativo';
+  for (const text of [coupon.code, benefit + (config.first_purchase ? ' · primeira compra' : ''), availability, coupon.usage_count + (config.total_limit === null ? ' · sem limite total' : ' de ' + config.total_limit)]) { const cell = document.createElement('td'); cell.textContent = text; row.append(cell); }
+  const cell = document.createElement('td'), button = document.createElement('button'); button.type = 'button'; button.className = 'secondary'; button.textContent = 'Editar'; button.disabled = !canManage; button.onclick = () => edit(coupon); cell.append(button); row.append(cell); $('coupons').append(row);
+ }
+ $('previous').disabled = offset === 0; $('next').disabled = offset + 50 >= total; $('page').textContent = 'Página ' + (Math.floor(offset / 50) + 1) + ' de ' + Math.max(1, Math.ceil(total / 50));
+}
+$('kind').onchange = updateKind; $('reset').onclick = reset;
+$('refresh').onclick = () => load().catch(error => show(error.message));
+$('previous').onclick = () => { offset = Math.max(0, offset - 50); load().catch(error => show(error.message)); };
+$('next').onclick = () => { if (offset + 50 < total) { offset += 50; load().catch(error => show(error.message)); } };
+$('coupon-form').onsubmit = async event => {
+ event.preventDefault(); $('save').disabled = true; show('');
+ const decimal = id => Number($(id).value).toFixed(2), optionalInt = id => $(id).value === '' ? null : Number($(id).value), date = id => $(id).value === '' ? null : new Date($(id).value).toISOString();
+ try {
+  await api('/api/admin/coupons' + (editing ? '/' + editing.id : ''), editing ? 'PUT' : 'POST', { code: $('code').value, ...(editing ? { version: editing.version } : {}), config: { kind: $('kind').value, value: decimal('value'), min_subtotal: decimal('minimum'), max_discount: $('maximum').value === '' ? null : decimal('maximum'), total_limit: optionalInt('total-limit'), per_customer_limit: optionalInt('customer-limit'), starts_at: date('starts'), ends_at: date('ends'), active: $('active').checked, first_purchase: $('first-purchase').checked } });
+  reset(); offset = 0; await load(); show('Cupom salvo.');
+ } catch (error) { show(error.message); } finally { $('save').disabled = false; }
+};
+$('timezone').textContent = 'Datas e horários no fuso do seu dispositivo: ' + Intl.DateTimeFormat().resolvedOptions().timeZone;
+api('/api/auth/me').then(async ({ user }) => { canManage = ['owner','manager'].includes(user.role); $('fields').disabled = !canManage; if (!canManage) show('Seu perfil permite somente consultar os cupons.'); await load(); }).catch(error => show(error.message));
+</script></body></html>

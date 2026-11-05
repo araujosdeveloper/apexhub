@@ -1,0 +1,69 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: [mysqld, --event-scheduler=OFF, --local-infile=OFF, --skip-log-bin]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${RELEASE_ROOT_PASSWORD:?Senha necessária}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: delivery_live_db
+      MYSQL_USER: delivery_app
+      MYSQL_PASSWORD: ${RELEASE_APP_PASSWORD:?Senha necessária}
+    volumes:
+      - release_data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+  prepare:
+    build: .
+    environment:
+      DB_PASSWORD: ${RELEASE_ROOT_PASSWORD:?Senha necessária}
+      SOURCE_SERVER_UUID: ${SOURCE_SERVER_UUID:-}
+      TARGET_SERVER_UUID: ${TARGET_SERVER_UUID:-}
+    command: [node, scripts/prepare-release.js]
+    user: "0:0"
+    volumes:
+      - type: bind
+        source: ${RELEASE_REPORT_DIR:?Pasta privada necessária}
+        target: /output
+    read_only: true
+    tmpfs:
+      - /tmp
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_USER: delivery_app
+      DB_PASSWORD: ${RELEASE_APP_PASSWORD:?Senha necessária}
+      DB_NAME: delivery_live_db
+      NODE_ENV: production
+      SECURE_COOKIES: "true"
+      PORT: "3000"
+    networks:
+      default:
+      public:
+        aliases:
+          - ${RELEASE_ALIAS:?Identificador da aplicação necessário}
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+networks:
+  default:
+    internal: true
+  public:
+    external: true
+    name: delivery-public-edge_default
+volumes:
+  release_data:

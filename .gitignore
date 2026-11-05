@@ -1,0 +1,42 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+*.save
+coverage/
+reports/
+
+backups/
+
+# Configuração privada de ferramentas e credenciais
+.aws/
+.agents/
+.codex/
+.ssh/
+*.pem
+*.key
+*.p12
+*.pfx
+client_secret*.json
+service-account*.json
+rclone.conf
+
+# Estado gerado no servidor; não faz parte do código
+/deploy/live-release.path
+/deploy/latest-update.path
+/deploy/public-edge/routes/
+__pycache__/
+*.py[cod]
+*.sql.gz
+*.sql.gpg
+*.sql.age
+*.dump
+*.tar.gz
+*.zip
+/exports/
+
+# Relatórios e instruções locais da VPS
+/relatorio-*.txt
+/retomada-sessao.txt
+/acesso-previa.txt

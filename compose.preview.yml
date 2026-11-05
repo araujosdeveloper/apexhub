@@ -1,0 +1,69 @@
+# Prévia descartável; não usa containers, redes ou volumes do legado.
+services:
+  mysql:
+    image: mysql:8.0
+    command: [mysqld, --event-scheduler=OFF, --local-infile=OFF, --skip-log-bin]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PREVIEW_ROOT_PASSWORD:?Senha necessária}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: delivery_preview_rehearsal_test
+      MYSQL_USER: preview_app
+      MYSQL_PASSWORD: ${PREVIEW_APP_PASSWORD:?Senha necessária}
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+  prepare:
+    build: .
+    command: [node, scripts/prepare-preview.js]
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ${PREVIEW_ROOT_PASSWORD:?Senha necessária}
+      DB_NAME: delivery_preview_rehearsal_test
+    user: "0:0"
+    volumes:
+      - type: bind
+        source: ${PREVIEW_REPORT_DIR:?Pasta privada necessária}
+        target: /output
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mysql:
+        condition: service_healthy
+  app:
+    build: .
+    environment:
+      DB_HOST: mysql
+      DB_USER: preview_app
+      DB_PASSWORD: ${PREVIEW_APP_PASSWORD:?Senha necessária}
+      DB_NAME: delivery_preview_rehearsal_test
+      NODE_ENV: development
+      SECURE_COOKIES: "false"
+      PORT: "3000"
+    networks:
+      - default
+      - access
+    ports:
+      - "127.0.0.1:3002:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+networks:
+  default:
+    internal: true
+  access:
+    driver: bridge

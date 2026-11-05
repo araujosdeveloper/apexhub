@@ -1,0 +1,16 @@
+{
+	email {$ACME_EMAIL}
+	default_sni {$PUBLIC_IP}
+}
+
+https://{$PUBLIC_IP} {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			profile shortlived
+		}
+	}
+	header X-Content-Type-Options nosniff
+	header Referrer-Policy strict-origin-when-cross-origin
+	import /etc/caddy/routes/*.caddy
+}

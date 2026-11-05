@@ -1,0 +1,25 @@
+/* Estrutura persistente: apenas o documento de conteúdo muda de rota. */
+:root { --sidebar: #121212; }
+html, body.apex-shell { height: 100%; overflow: hidden; }
+.apex-shell .workspace { position: fixed; inset: 0 0 0 var(--sidebar-width); margin: 0; display: grid; grid-template-rows: auto minmax(0,1fr); }
+.apex-shell .topbar { position: relative; flex-shrink: 0; }
+.apex-shell .breadcrumb { display: inline-flex; align-items: center; }
+.apex-shell .view-port { position: relative; padding: 0; margin: 0; min-height: 0; min-width: 0; width: 100%; max-width: none; overflow: hidden; }
+#page-view { width: 100%; height: 100%; display: block; border: 0; background: #121212; color-scheme: dark; }
+.view-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #121212; color: #b0b0b0; z-index: 5; }
+.shell-feedback { position: absolute; top: 14px; left: 20px; right: 20px; padding: 13px; background: #332216; border: 1px solid #70431e; color: #ffd0a2; z-index: 8; border-radius: 8px; }
+.apex-shell .nav-link { margin-block: 2px; padding-block: 10px; }
+.apex-shell .nav-link.sub-link { margin-left: 20px; padding-left: 28px; font-size: 12px; }
+.apex-shell .nav-link.sub-link::before { display: none; }
+.apex-shell .nav-label-secondary { margin-top: 22px; }
+.apex-shell .brand { margin-bottom: 22px; }
+.apex-shell .sidebar-bottom { flex-shrink: 0; }
+@media(max-width:1250px) { .apex-shell .breadcrumb { font-size: 11px; }.apex-shell .breadcrumb>span:first-child { display: none; } }
+@media(max-width:1000px) { .apex-shell .breadcrumb { display: none; } }
+@media(max-width:760px) { .apex-shell .workspace { left: 0; }.apex-shell .topbar { position: relative; } }
+/* O título do módulo também permanece no header de tablet e celular. */
+.apex-shell .breadcrumb { min-width:0; max-width:260px; flex-shrink:1; }
+.apex-shell .breadcrumb strong { overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:1250px) { .apex-shell .breadcrumb>span { display:none; } }
+@media(max-width:1000px) { .apex-shell .breadcrumb { display:inline-flex; } }
+@media(max-width:760px) { .apex-shell .breadcrumb { order:2; flex-basis:100%; width:100%; max-width:none; font-size:12px; }.apex-shell .global-search { order:3; } }

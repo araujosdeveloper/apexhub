@@ -1,0 +1,11 @@
+[
+  { "id": "sauces", "name": "Escolha o molho", "min": 1, "max": 1, "options": [
+    { "id": "ketchup", "name": "Ketchup", "price": "0.00", "active": true },
+    { "id": "mayo", "name": "Maionese", "price": "0.50", "active": true }
+  ] },
+  { "id": "extras", "name": "Extras", "min": 0, "max": 2, "options": [
+    { "id": "cheese", "name": "Queijo", "price": "2.50", "active": true },
+    { "id": "bacon", "name": "Bacon", "price": "4.00", "active": true },
+    { "id": "chili", "name": "Pimenta", "price": "1.00", "active": false }
+  ] }
+]

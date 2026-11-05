@@ -1,0 +1,39 @@
+name: delivery-migration-rehearsal
+services:
+  mysql:
+    image: mysql:8.0
+    command: [mysqld, --event-scheduler=OFF, --local-infile=OFF, --skip-log-bin]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${REHEARSAL_PASSWORD:?Senha temporária necessária}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: delivery_rehearsal_test
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+  runner:
+    build: .
+    command: [node, scripts/rehearse-migration.js]
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ${REHEARSAL_PASSWORD:?Senha temporária necessária}
+      DB_NAME: delivery_rehearsal_test
+    user: "0:0"
+    volumes:
+      - type: bind
+        source: ${REHEARSAL_REPORT_DIR:?Pasta privada de relatório necessária}
+        target: /output
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mysql:
+        condition: service_healthy
+networks:
+  default:
+    internal: true

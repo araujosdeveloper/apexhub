@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Acesse seu restaurante</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6fa;color:#172139;font:16px system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}main{width:100%;max-width:460px;background:white;padding:36px;border:1px solid #e3e7ee;border-radius:20px;box-shadow:0 16px 50px #1721390a}h1{font-size:28px;margin:12px 0}p{color:#657087;line-height:1.6}label{display:block;font-size:14px;font-weight:600;margin:18px 0 7px}input{width:100%;padding:13px;border:1px solid #cbd2df;border-radius:8px;font:inherit}button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:13px;width:100%;margin-top:24px;background:#2563eb;color:white;font-weight:600}button:disabled{opacity:.6;cursor:wait}.secondary{background:transparent;color:#2563eb;margin-top:8px}.brand{font-size:13px;letter-spacing:.15em;font-weight:700;color:#2563eb}#message{color:#b42318;font-size:14px}small{display:block;color:#657087;margin-top:7px}.hidden{display:none}
+</style></head>
+<body><main><div class="brand">DELIVERY SAAS</div><h1 id="title">Seu restaurante, conectado.</h1><p id="description">Entre para acompanhar seus pedidos e gerenciar sua operação.</p>
+<form id="auth-form">
+<div class="registration hidden"><label for="name">Seu nome</label><input id="name" maxlength="120" autocomplete="name"><label for="company">Nome do restaurante</label><input id="company" maxlength="160" autocomplete="organization"><label for="slug">Endereço da loja</label><input id="slug" minlength="3" maxlength="80" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="meu-restaurante"><small>Use letras minúsculas, números e hífens.</small></div>
+<label for="email">E-mail</label><input id="email" type="email" maxlength="254" autocomplete="username" required>
+<label for="password">Senha</label><input id="password" type="password" maxlength="128" autocomplete="current-password" required>
+<p id="message" role="alert" aria-live="polite"></p><button id="submit" type="submit">Entrar no painel</button>
+</form><button class="secondary" id="toggle" type="button">Cadastrar meu restaurante</button>
+<script>
+let registering = false;
+const form = document.getElementById('auth-form');
+document.getElementById('toggle').addEventListener('click', () => {
+ registering = !registering;
+ document.querySelector('.registration').classList.toggle('hidden', !registering);
+ for (const id of ['name','company','slug']) document.getElementById(id).required = registering;
+ document.getElementById('password').minLength = registering ? 12 : 1;
+ document.getElementById('password').autocomplete = registering ? 'new-password' : 'current-password';
+ document.getElementById('title').textContent = registering ? 'Comece sua operação.' : 'Seu restaurante, conectado.';
+ document.getElementById('description').textContent = registering ? 'Cadastre sua loja e experimente por 14 dias. Senha com pelo menos 12 caracteres.' : 'Entre para acompanhar seus pedidos e gerenciar sua operação.';
+ document.getElementById('submit').textContent = registering ? 'Criar minha loja' : 'Entrar no painel';
+ document.getElementById('toggle').textContent = registering ? 'Já tenho uma conta' : 'Cadastrar meu restaurante';
+ document.getElementById('message').textContent = '';
+});
+form.addEventListener('submit', async event => {
+ event.preventDefault();
+ const button = document.getElementById('submit'); button.disabled = true;
+ const body = { email: document.getElementById('email').value, password: document.getElementById('password').value };
+ if (registering) Object.assign(body, { name: document.getElementById('name').value, company_name: document.getElementById('company').value, slug: document.getElementById('slug').value });
+ try {
+  const response = await fetch('/api/auth/' + (registering ? 'register' : 'login'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const result = await response.json();
+  if (!response.ok) { document.getElementById('message').textContent = result.error; return; }
+  const identity=await fetch('/api/auth/me');
+  const {user}=identity.ok?await identity.json():{};
+  location.assign(user&&['owner','manager'].includes(user.role)?'/dashboard.html':'/admin.html');
+ } catch { document.getElementById('message').textContent = 'Não foi possível conectar. Tente novamente.'; }
+ finally { button.disabled = false; }
+});
+</script></main></body></html>

@@ -1,0 +1,12 @@
+**/node_modules
+**/.env
+**/.env.*
+**/*.log
+.git
+.agents
+.codex
+.aws
+
+backups/
+
+reports/

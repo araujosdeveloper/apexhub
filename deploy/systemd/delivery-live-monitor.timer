@@ -1,0 +1,10 @@
+[Unit]
+Description=Monitoramento Delivery SaaS a cada cinco minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=delivery-live-monitor.service
+
+[Install]
+WantedBy=timers.target

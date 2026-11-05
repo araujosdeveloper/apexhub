@@ -1,0 +1,73 @@
+name: delivery-saas-dev
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Preencha MYSQL_ROOT_PASSWORD no arquivo .env.docker}
+      MYSQL_DATABASE: delivery_saas_db
+      MYSQL_USER: delivery_app
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Preencha DB_PASSWORD no arquivo .env.docker}
+    volumes:
+      - saas_dev_data:/var/lib/mysql
+      - ./database:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u delivery_app -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_USER: delivery_app
+      DB_PASSWORD: ${DB_PASSWORD:?Preencha DB_PASSWORD no arquivo .env.docker}
+      DB_NAME: delivery_saas_db
+      NODE_ENV: development
+      SECURE_COOKIES: "false"
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:${APP_PORT:-3001}:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+  mysql-test:
+    image: mysql:8.0
+    profiles: [test]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Preencha MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: delivery_saas_test
+      MYSQL_USER: delivery_test
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Preencha DB_PASSWORD}
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u delivery_test -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+  integration:
+    build: .
+    profiles: [test]
+    command: [node, --test, integration/mysql.test.js]
+    environment:
+      DB_HOST: mysql-test
+      DB_USER: delivery_test
+      DB_PASSWORD: ${DB_PASSWORD:?Preencha DB_PASSWORD}
+      DB_NAME: delivery_saas_test
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+volumes:
+  saas_dev_data:

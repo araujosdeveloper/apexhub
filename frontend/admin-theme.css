@@ -1,0 +1,58 @@
+/* Tema único das views. Carregado depois dos estilos locais, somente em tela. */
+:root { color-scheme: dark; --border:#303030; --blue:#ff7f00; --primary:#ff7f00; --surface:#1e1e1e; --text:#f5f5f5; }
+html.apex-view-root, body.apex-view { background:#121212!important; color:#f5f5f5!important; }
+body.apex-view { margin:0!important; font:14px/1.55 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important; }
+.apex-view main { max-width:none!important; margin:0!important; padding:26px!important; }
+.apex-view .app-shell { max-width:none!important; margin:0!important; }
+.apex-view nav[aria-label="Navegação do restaurante"] { display:none!important; }
+/* O header antigo vira uma barra de ações local, sem marca ou navegação duplicada. */
+.apex-view[data-view] .topbar { position:static!important; background:transparent!important; border:0!important; padding:20px 26px 0!important; justify-content:flex-end; }
+.apex-view[data-view] .topbar>div:first-child, .apex-view[data-view] #logout { display:none!important; }
+.apex-view .top-actions { gap:10px; }.apex-view .top-actions .connection { color:#b0b0b0; }
+.apex-view-dashboard .sidebar, .apex-view-dashboard .topbar, .apex-view-dashboard .sidebar-backdrop, .apex-view-dashboard .skip-link { display:none!important; }
+.apex-view-dashboard .workspace { margin:0!important; }
+.apex-view :is(h1,h2,h3,h4,strong,.customer,.order-number,.quantity,#live-status) { color:#f5f5f5!important; }
+.apex-view :is(p,label,small,.muted,.tag,.timer,.payment,.addon-list,.queue-heading,.page-heading p,#last-sync,#subscription) { color:#b0b0b0!important; }
+.apex-view h1 { font-size:28px; letter-spacing:-.6px; }.apex-view h2 { font-size:21px; letter-spacing:-.4px; }
+.apex-view a { color:#ff9a35; }.apex-view a:hover { color:#ffc187; }
+.apex-view :is(.panel,.filters,.stats button,.order-card) { background:#1e1e1e!important; border-color:#303030!important; color:#f5f5f5!important; box-shadow:none; border-radius:12px; }
+.apex-view-catalog main>section, .apex-view-catalog main>.grid>section, .apex-view-operations fieldset>section, .apex-view-addons #groups>section { background:#1e1e1e!important; border-color:#303030!important; }
+.apex-view :is(input,select,textarea) { background:#181818!important; color:#f5f5f5!important; border:1px solid #3a3a3a!important; border-radius:8px!important; accent-color:#ff7f00; }
+.apex-view :is(input,select,textarea):focus { outline:2px solid #ff7f0070; outline-offset:2px; border-color:#ff7f00!important; }
+.apex-view input::placeholder,.apex-view textarea::placeholder { color:#929292; }
+.apex-view input[type=checkbox] { width:auto; }.apex-view input[type=file]::file-selector-button { background:#30271e; border:1px solid #5c4026; color:#ffad5b; padding:7px 12px; margin-right:12px; border-radius:6px; }
+.apex-view button { background:#ff7f00!important; color:#15100a!important; border:1px solid #ff7f00!important; border-radius:8px; transition:background .2s,border-color .2s,transform .2s; }
+.apex-view button:hover:not(:disabled) { background:#ff962d!important; border-color:#ff962d!important; }
+.apex-view :is(button.secondary,button.print,.cancel,#reset,#cancel-edit) { background:#272727!important; color:#e5e5e5!important; border:1px solid #404040!important; }
+.apex-view .cancel { color:#ff8585!important; border-color:#ff525240!important; }
+.apex-view :is(button.secondary,button.print):hover:not(:disabled) { background:#34302a!important; color:#ffad5b!important; }
+.apex-view :focus-visible { outline:2px solid #ff7f00; outline-offset:3px; }
+.apex-view :is(th,td,article,.history,.delivery,.driver,.items,.items>li,.row,.option) { border-color:#303030!important; }
+.apex-view table { color:#f5f5f5!important; }.apex-view th { color:#b0b0b0!important; background:#242424!important; font-weight:600; }
+.apex-view td { color:#e5e5e5!important; }.apex-view tbody tr:nth-child(even) { background:#ffffff02; }.apex-view tbody tr:hover { background:#ffffff04; }
+.apex-view :is(.stage-heading span,.order-type) { background:#32251b!important; color:#ffad5b!important; }.apex-view .order-type.pickup { background:#2b2340!important; color:#c5acff!important; }
+.apex-view .order-card { border-top-color:#ff7f00; }.apex-view .order-card.preparing { border-top-color:#32d1d4; }.apex-view .order-card.ready,.apex-view .order-card.completed { border-top-color:#00e676; }.apex-view .order-card.delivering { border-top-color:#ac91ff; }.apex-view .order-card.cancelled { border-top-color:#ff5252; }
+.apex-view .stats button { border-left-color:#ff7f00; }.apex-view .stats button[data-filter=preparing] { border-left-color:#32d1d4; }.apex-view .stats button[data-filter=ready] { border-left-color:#00e676; }.apex-view .stats button[data-filter=delivering] { border-left-color:#ac91ff; }
+.apex-view .notes { background:#ff7f000c!important; color:#e4c4a1!important; }.apex-view .notice { background:#242424!important; border-color:#444!important; color:#e4e4e4!important; }.apex-view .notice.error,.apex-view #error { background:#ff52520d!important; color:#ff9999!important; border-color:#ff525240!important; }
+.apex-view .new-orders { background:#00e6760c!important; border-color:#00e67630!important; }.apex-view .actions { background:#121212!important; }
+.apex-view #message { color:#ffb369!important; }.apex-view .overdue .timer { color:#ffad5b!important; }
+.apex-view .view-controls { display:flex; gap:6px; padding:4px; border:1px solid #333; background:#1e1e1e; border-radius:9px; }
+.apex-view .view-controls button { padding:7px 13px; margin:0; font-size:12px; background:transparent!important; border-color:transparent!important; color:#b0b0b0!important; }
+.apex-view .view-controls button[aria-pressed=true] { background:#ff7f001c!important; color:#ffad5b!important; }
+.apex-view .board.orders-list { display:block; overflow-x:auto; background:#1e1e1e; border:1px solid #303030; border-radius:12px; }
+.order-list-table { width:100%; border-collapse:collapse; text-align:left; min-width:760px; }.order-list-table th,.order-list-table td { padding:15px 16px; border-bottom:1px solid #303030; vertical-align:middle; }.order-list-table th { font-size:12px; }.order-list-table td { font-size:13px; }
+.order-list-table small { display:block; margin-top:3px; }.order-list-actions { display:flex; align-items:center; gap:8px; }.order-list-actions button { font-size:12px; white-space:nowrap; padding:8px 10px; }.order-detail-row .order-card { max-width:850px; margin:8px auto; }.order-detail-row td { background:#171717; }
+.order-status { display:inline-block; border-radius:5px; padding:5px 8px; font-size:12px; white-space:nowrap; background:#ff7f0015; color:#ffad5b; }.order-status.preparing { background:#32d1d415; color:#73dce2; }.order-status.ready,.order-status.completed { background:#00e67610; color:#00e676; }.order-status.delivering { background:#ac91ff15; color:#cbb8ff; }.order-status.cancelled { background:#ff525215; color:#ff8585; }
+@media(max-width:1100px) { .apex-view .board.columns-4 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:700px) { .apex-view main { padding:18px!important; }.apex-view .page-heading { align-items:flex-start; flex-wrap:wrap; }.apex-view .board:not(.orders-list) { grid-template-columns:1fr!important; }.apex-view .stats { grid-template-columns:repeat(2,minmax(0,1fr)); }.apex-view .form-grid { grid-template-columns:1fr; } }
+@media(prefers-reduced-motion:reduce) { .apex-view * { transition:none!important; } }
+.apex-view .page-toolbar { padding:20px 26px 0; display:flex; justify-content:flex-end; }
+.apex-view-dashboard .kpi-card { background:#1e1e1e!important; }
+.apex-view-dashboard .segmented button { background:#181818!important; color:#b0b0b0!important; border-color:#333!important; }
+.apex-view-dashboard .segmented button.selected { background:#ff7f001c!important; color:#ffad5b!important; border-color:#ff7f0040!important; }
+.apex-view .button-secondary { background:#272727!important; color:#e5e5e5!important; border-color:#404040!important; }
+.apex-view main>a:first-child { display:none; }
+.apex-view .stats strong { font-size:30px; }
+.apex-view .page-heading h1 { margin:0 0 7px; line-height:1.25; }
+.apex-view .content-shortcuts { display:flex; flex-wrap:wrap; gap:10px; margin:20px 0; }
+.apex-view .content-shortcuts a { border:1px solid #3a3026; background:#ff7f0009; border-radius:7px; padding:8px 12px; font-size:13px; text-decoration:none; }

@@ -1,0 +1,21 @@
+name: delivery-public-edge
+services:
+  edge:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_IP: ${PUBLIC_IP:?Informe o IP público}
+      ACME_EMAIL: ${ACME_EMAIL:?Informe o e-mail de contato}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/public-edge:/etc/caddy:ro
+      - edge_data:/data
+      - edge_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+volumes:
+  edge_data:
+  edge_config:

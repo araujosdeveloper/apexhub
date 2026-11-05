@@ -1,0 +1,11 @@
+[Unit]
+Description=Teste isolado de restauracao do backup Delivery SaaS
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/bin/bash /root/delivery-saas/scripts/verify-live-backup.sh
+TimeoutStartSec=2h

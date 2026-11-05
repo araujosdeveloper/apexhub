@@ -1,0 +1,6 @@
+# Usado somente pelo atualizador: banco/volume/redes continuam os da publicação ativa.
+services:
+  app:
+    image: ${DELIVERY_UPDATE_IMAGE:?Informe a imagem validada}
+  prepare:
+    image: ${DELIVERY_UPDATE_IMAGE:?Informe a imagem validada}

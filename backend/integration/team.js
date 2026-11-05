@@ -1,0 +1,33 @@
+const assert=require('node:assert/strict');
+const {randomUUID}=require('node:crypto');
+async function verifyTeam(db,request,{a,b,json}){
+ const [[identity]]=await db.query('SELECT DATABASE() AS name');assert.match(identity.name,/_test$/);
+ const email='team-'+randomUUID()+'@example.com',password='Equipe-'+randomUUID();
+ const create=await request('/api/admin/team',json('POST',{name:'Operador de teste',email,password,role:'operator',active:true},a.cookie));assert.equal(create.status,201);const id=(await create.json()).id;
+ const roster=async()=>{const response=await request('/api/admin/team',{headers:{Cookie:a.cookie}});assert.equal(response.status,200);return response.json();};
+ const person=async()=>{const data=await roster();assert.ok(data.users.every(user=>user.password_hash===undefined));return data.users.find(user=>user.id===id);};
+ const login=async(email,password)=>request('/api/auth/login',json('POST',{email,password}));
+ const initial=await login(email,password);assert.equal(initial.status,200);const staffCookie=String(initial.headers['set-cookie']).split(';')[0];
+ for(const url of ['/api/admin/team','/api/admin/reports/sales','/api/admin/customers'])assert.equal((await request(url,{headers:{Cookie:staffCookie}})).status,403);
+ assert.equal((await request('/api/admin/orders/board',{headers:{Cookie:staffCookie}})).status,200);
+ assert.equal((await request('/api/admin/categories',json('POST',{name:'Não permitido'},staffCookie))).status,403);
+ const input={name:'Operador de teste',email,role:'operator',active:true};
+ const first=await person();
+ assert.equal((await request('/api/admin/team/'+id,json('PUT',{...input,revision:first.revision},b.cookie))).status,404);
+ const me=await(await request('/api/auth/me',{headers:{Cookie:a.cookie}})).json();
+ assert.equal((await request('/api/admin/team/'+me.user.id,json('PUT',{...input,revision:first.revision},a.cookie))).status,403);
+ assert.equal((await request('/api/admin/team',json('POST',{...input,email:'owner-'+randomUUID()+'@example.com',password,role:'owner'},a.cookie))).status,400);
+ assert.equal((await request('/api/admin/team',json('POST',{...input,password},a.cookie))).status,409);
+ const disable=await request('/api/admin/team/'+id,json('PUT',{...input,active:false,revision:first.revision},a.cookie));assert.equal(disable.status,200);
+ assert.equal((await request('/api/auth/me',{headers:{Cookie:staffCookie}})).status,401);assert.equal((await login(email,password)).status,401);
+ const blocked=await person(),newPassword='Nova-'+randomUUID();
+ assert.equal((await request('/api/admin/team/'+id,json('PUT',{...input,role:'manager',password:newPassword,revision:blocked.revision},a.cookie))).status,200);
+ assert.equal((await request('/api/auth/me',{headers:{Cookie:staffCookie}})).status,401);assert.equal((await login(email,password)).status,401);
+ const managerLogin=await login(email,newPassword);assert.equal(managerLogin.status,200);const managerCookie=String(managerLogin.headers['set-cookie']).split(';')[0];
+ assert.equal((await request('/api/admin/reports/sales',{headers:{Cookie:managerCookie}})).status,200);
+ assert.equal((await request('/api/admin/team',{headers:{Cookie:managerCookie}})).status,403);
+ const current=await person();const competing=await Promise.all(['Nome A','Nome B'].map(name=>request('/api/admin/team/'+id,json('PUT',{...input,name,role:'manager',revision:current.revision},a.cookie))));assert.deepEqual(competing.map(r=>r.status).sort(),[200,409]);
+ assert.equal((await request('/api/auth/me',{headers:{Cookie:managerCookie}})).status,401);
+ const [[account]]=await db.execute('SELECT password_hash FROM users WHERE id=? AND company_id=?',[id,a.id]);assert.match(account.password_hash,/^scrypt:/);assert.notEqual(account.password_hash,newPassword);
+}
+module.exports={verifyTeam};
