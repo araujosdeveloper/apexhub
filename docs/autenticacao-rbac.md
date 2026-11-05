@@ -1,6 +1,6 @@
 # Autenticação, RBAC e isolamento ApexHub
 
-Implementado em 05/11/2026, preparado para atualização. Publicação e integração MySQL desta entrega ainda não confirmadas. A versão atualmente confirmada em produção é o Master de 18:06 UTC.
+JWT, RBAC e isolamento multi-tenant publicados em 05/11/2026 às 19:04 UTC. STATUS=PUBLICADO e ponteiro latest-update confirmados em `reports/update-20261105T190222Z-288608`; backup final `backups/live/live-20261105T190408Z-293998`. Integração MySQL real aprovada em `reports/mysql-validation-20261105T190304Z-290916.log`, incluindo emissão JWT, claims, tenant, IDOR, perfis, revogação e suspensão. Ensaio da cópia, preservação dos dados, configuração das chaves, canário e verificações HTTP aprovados. Nenhuma migração SQL aplicada; dados anteriores preservados. Conferência manual dos logins pelo responsável ainda não confirmada.
 
 ## Identidade e middlewares
 
@@ -76,8 +76,8 @@ Não há nova migração de banco. Sessões existentes são preservadas. A inici
 
 ## Verificação e referências
 
-Testes cobrem interoperabilidade com WebCrypto, algoritmo/tipo/audiência, expiração, claims inválidas, separação Master/tenant, perfis, sessão revogada, precedência do bearer, emissão, renovação, logout e imutabilidade do tenant. Integração MySQL foi ampliada para IDOR, inserção com tenant forjado, modificação de outra empresa, mudança de senha/perfil e suspensão. O ensaio da cópia também verifica JWT. Docker continua inacessível nesta sessão; a execução real no MySQL será feita pelo atualizador no host.
+Testes cobrem interoperabilidade com WebCrypto, algoritmo/tipo/audiência, expiração, claims inválidas, separação Master/tenant, perfis, sessão revogada, precedência do bearer, emissão, renovação, logout e imutabilidade do tenant. Integração MySQL foi ampliada para IDOR, inserção com tenant forjado, modificação de outra empresa, mudança de senha/perfil e suspensão. O ensaio da cópia também verifica JWT. Execução real no MySQL aprovada pelo atualizador no host em 05/11/2026 às 19:04 UTC.
 
 Referências primárias: [JWT — RFC 7519](https://www.rfc-editor.org/rfc/rfc7519), [boas práticas JWT — RFC 8725](https://www.rfc-editor.org/rfc/rfc8725) e [env_file — Docker Compose](https://docs.docker.com/reference/compose-file/services/#env_file).
 
-Validação local concluída: 265 testes aprovados, incluindo geração privada/idempotente das chaves e login com JWT; sintaxe backend/frontend/scripts e Compose aprovados. Seis simulações do atualizador e quatro do publicador inicial aprovadas. A execução MySQL real e a publicação continuam pendentes de execução no host.
+Validação local concluída: 265 testes aprovados, incluindo geração privada/idempotente das chaves e login com JWT; sintaxe backend/frontend/scripts e Compose aprovados. Seis simulações do atualizador e quatro do publicador inicial aprovadas. Execução MySQL real e publicação posteriormente confirmadas no host, conforme os relatórios acima.
