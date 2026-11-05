@@ -1,6 +1,6 @@
 # API Super Admin ApexHub
 
-Implementada e preparada para publicação em 05/11/2026. Publicação e execução MySQL desta entrega ainda não confirmadas. As credenciais Master existentes não são recriadas pelo atualizador. Sem nova migração de banco.
+API Super Admin publicada em 05/11/2026 às 20:25 UTC. STATUS=PUBLICADO e ponteiro latest-update confirmados em `reports/update-20261105T202338Z-384376`; backup final `backups/live/live-20261105T202528Z-389880`. Integração MySQL real aprovada em `reports/mysql-validation-20261105T202420Z-386763.log`: cadastro transacional, paginação, status, revogação, métricas e restrição de perfil. Ensaio da cópia, dados anteriores preservados, canário e verificações HTTP aprovados. Nenhuma migração SQL aplicada. Esta entrega é de backend; o painel mantém a interface existente. As credenciais Master existentes não são recriadas pelo atualizador.
 
 ## Arquivos e autenticação
 
@@ -114,9 +114,9 @@ PM2 captura stderr de processos gerenciados; consultar `pm2 logs NOME_DO_PROCESS
 
 ## Publicação e validação
 
-284 testes locais aprovados nesta entrega, incluindo autorização, envelope, cadastro/suspensão transacional, rollback, dados sensíveis e cálculo do MRR. Integração MySQL e smoke da cópia ampliados para criação, duplicidade, paginação, métricas, bloqueio e reativação com sessões revogadas. A execução real no MySQL e a publicação continuam pendentes: o Docker desta sessão está bloqueado.
+284 testes locais aprovados nesta entrega, incluindo autorização, envelope, cadastro/suspensão transacional, rollback, dados sensíveis e cálculo do MRR. Integração MySQL e smoke da cópia ampliados para criação, duplicidade, paginação, métricas, bloqueio e reativação com sessões revogadas. Execução MySQL real e publicação confirmadas no host às 20:25 UTC, conforme os relatórios acima.
 
-No terminal do host:
+Para futuras atualizações, no terminal do host:
 
 ```bash
 bash /root/delivery-saas/scripts/update-live.sh
