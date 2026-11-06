@@ -38,6 +38,8 @@ services:
         required: false
       - path: .env.plans
         required: false
+      - path: .env.ai
+        required: false
     build: .
     restart: unless-stopped
     environment:

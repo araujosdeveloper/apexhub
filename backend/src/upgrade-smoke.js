@@ -83,6 +83,7 @@ async function verifyUpgradeSmoke(db) {
   const menuProduct=await request('/api/tenant/menu/products',json('POST',{category_id:(await menuCat.json()).data.id,name:'Novo item',price:'9.90',options:[{name:'Extra',additional_price:'1.00',max_quantity:1}]},cookie));assert.equal(menuProduct.status,201);const menuProductId=(await menuProduct.json()).data.id;
   assert.equal((await request('/api/tenant/menu/products/'+menuProductId+'/availability',json('PUT',{is_available:false},cookie))).status,200);
   assert.equal((await request('/api/tenant/menu/products/'+menuProductId,json('DELETE',{},cookie))).status,200);
+  const imported=await request('/api/tenant/menu/confirm-import',{method:'POST',headers:{Authorization:'Bearer '+signed.access_token,'Content-Type':'application/json'},body:JSON.stringify({categories:[{name:'Importação ensaio',products:[{name:'Item importado',description:'Revisado',price:'7.50'}]}]})});assert.equal(imported.status,201);assert.equal((await imported.json()).data.product_count,1);
   await require('../integration/master').verifyMaster(pool,request,{a:{id:me.user.company_id,cookie},b:{id:me.user.company_id,cookie},json});
 }
 module.exports = { verifyUpgradeSmoke };

@@ -34,7 +34,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
   for (const statement of sql.split(';').map(s => s.trim()).filter(Boolean)) await db.query(statement);
  }
  t.diagnostic('Esquema inicial e tabela de idempotência aplicados no MySQL real.');
- const request = await serve(t, db,{jwt:require('../test-support/jwt').testJwt()});
+ const request = await serve(t, db,{jwt:require('../test-support/jwt').testJwt(),menuImportExtractor:async()=>({categories:[{name:'Prévia',products:[{name:'Produto da prévia',description:'',price:'1.00'}]}]})});
  const json = (method, body, cookie, key) => ({ method, headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(body) });
  async function register() {
   const slug = 'test-' + randomUUID();
@@ -126,6 +126,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  await verifyCoupons(db, request, { a, b, productId: product.id, json });
  await require('./customers').verifyCustomers(db, request, { a, b, productId: product.id });
  await require('./drivers').verifyDrivers(db,request,{a,b,orderId:variantOrder.order_id,pickupId:pickupOrder.order_id,json});
+ await require('./menu-import').verifyMenuImport(db,request,{a,b});
  await require('./tenant-menu').verifyTenantMenu(db,request,{a,b});
  await require('./reports').verifyReports(db,request,{a,b,productId:product.id});
  await require('./team').verifyTeam(db,request,{a,b,json});
