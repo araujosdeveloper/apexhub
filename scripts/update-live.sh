@@ -196,5 +196,5 @@ public_get /apex-tokens.css >/dev/null
 printf 'PUBLICADO\n' > "$update_dir/STATUS.txt"
 printf '%s\n' "$update_dir" > deploy/latest-update.path
 completed=true
-printf '\nATUALIZAÇÃO PUBLICADA: containers responsivos e largura corrigida ApexHub.\n'
+printf '\nATUALIZAÇÃO PUBLICADA: cardápio claro em tela cheia ApexHub.\n'
 printf 'Painel: https://179.198.120.188/login.html\nMaster: https://179.198.120.188/master-login.html\nBackup final: %s\nRelatório: %s\n' "$final_backup" "$update_dir"
