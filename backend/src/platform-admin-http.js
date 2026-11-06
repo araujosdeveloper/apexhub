@@ -1,5 +1,5 @@
 const {randomUUID}=require('node:crypto');
-const isPlatformAdminPath=path=>/^\/api\/admin\/(?:tenants|metrics|reports\/global-financial)(?:\/|$)/i.test(path)||/^\/api\/tenant\/(?:reports|menu)(?:\/|$)/i.test(path)||/^\/api\/auth\/impersonation(?:\/|$)/i.test(path);
+const isPlatformAdminPath=path=>/^\/api\/admin\/(?:tenants|metrics|menu|reports\/global-financial)(?:\/|$)/i.test(path)||/^\/api\/tenant\/(?:reports|menu)(?:\/|$)/i.test(path)||/^\/api\/auth\/impersonation(?:\/|$)/i.test(path);
 class AdminError extends Error{constructor(status,message){super(message);this.status=status;}}
 function responseEnvelope(req,res,next){
  req.requestId=randomUUID();res.set({'X-Request-ID':req.requestId,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'});

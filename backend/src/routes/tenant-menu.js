@@ -6,7 +6,7 @@ const {requireRoles}=require('../middlewares/auth');
 const {adminErrorHandler}=require('../platform-admin-http');
 const {createTenantMenuController}=require('../controllers/tenant-menu');
 function tenantMenuRouter(db,auth,logger=console,importOptions={}){
- const importer=createMenuImportController(db,{...importOptions,logger}),gate=importGate();
+ const importer=createMenuImportController(db,{...importOptions,logger}),gate=importOptions.gate||importGate();
  const jwtOnly=(req,res,next)=>req.auth?.credential==='bearer'?next():res.status(401).json({success:false,data:null,message:'Envie um JWT válido no cabeçalho Authorization: Bearer.'});
  const router=express.Router(),controller=createTenantMenuController(db,logger),manage=requireRoles('tenant_owner','tenant_manager');
  router.use(auth,manage);

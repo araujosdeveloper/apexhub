@@ -10,7 +10,7 @@ async function verifyMaster(db,request,{a,b,json}){
   const masterAccess=(await login.json()).access_token;assert.ok(masterAccess);const bearer={Authorization:'Bearer '+masterAccess};
   assert.equal((await request('/api/master/overview',{headers:bearer})).status,200);
   assert.equal((await request('/api/admin/catalog',{headers:bearer})).status,401);
-  await require('./platform-admin').verifyPlatformAdmin(db,request,{bearer,a});
+  await require('./platform-admin').verifyPlatformAdmin(db,request,{bearer,a,masterCookie:cookie});
   const secondary=await request('/api/master/auth/login',json('POST',{email,password}));assert.equal(secondary.status,200);const secondCookie=String(secondary.headers['set-cookie']).split(';')[0],secondToken=(await secondary.json()).access_token;
   const child=await request('/api/admin/tenants/'+b.id+'/impersonate',json('POST',{reason:'Validação de revogação pelo Master'}));assert.equal(child.status,401);
   const childAuthorized=await request('/api/admin/tenants/'+b.id+'/impersonate',{method:'POST',headers:{Authorization:'Bearer '+secondToken,'Content-Type':'application/json'},body:'{}'});assert.equal(childAuthorized.status,200);const childToken=(await childAuthorized.json()).data.access_token;assert.equal((await request('/api/auth/me',{headers:{Authorization:'Bearer '+childToken}})).status,200);

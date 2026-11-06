@@ -3,13 +3,14 @@
 <head><meta charset="utf-8"><link rel="stylesheet" href="/apex-tokens.css"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>ApexHub • Master</title>
 <!-- Tailwind CSS sem JavaScript remoto. O CSS local mantém o painel disponível sem CDN. -->
 <link id="tailwind" rel="stylesheet" media="print" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-<link rel="stylesheet" href="/master.css"><script src="/master.js" defer></script></head>
+<link rel="stylesheet" href="/master.css"><link rel="stylesheet" href="/master-menu-import.css"><script src="/master.js" defer></script><script src="/master-menu-import.js" defer></script></head>
 <body><a class="skip" href="#content">Pular para conteúdo</a>
 <button class="backdrop" id="backdrop" aria-label="Fechar navegação" hidden></button>
 <aside class="sidebar" id="sidebar" aria-label="Menu Master"><a class="brand" href="#overview"><span class="brand-icon">A</span>ApexHub <small>MASTER</small></a><p class="nav-label">CONTROLE DA PLATAFORMA</p>
 <nav id="navigation">
 <a href="#overview" data-page="overview"><span aria-hidden="true">◫</span>Visão global</a>
 <a href="#tenants" data-page="tenants"><span aria-hidden="true">▦</span>Empresas / Lojas</a>
+<a href="#menu-import" data-page="menu-import"><span aria-hidden="true">⇧</span>Importar cardápio com IA</a>
 <a href="#plans" data-page="plans"><span aria-hidden="true">◇</span>Planos e assinaturas</a>
 <a href="#finance" data-page="finance"><span aria-hidden="true">↗</span>Financeiro global</a>
 <a href="#monitor" data-page="monitor"><span aria-hidden="true">⌁</span>Logs e monitoramento</a>
@@ -31,6 +32,27 @@
 <section data-section="finance" class="card integration" hidden><span class="integration-icon">↗</span><h2>Financeiro global</h2><p>Gateway e repasses aguardam integração.</p><p class="muted">MRR, recebíveis, taxas e repasses estarão disponíveis após a conexão com o provedor de cobrança. O volume de pedidos das lojas não representa receita do SaaS.</p><a href="#plans" class="button">Ver assinaturas cadastradas →</a></section>
 <section data-section="monitor" class="card" hidden><div class="card-heading"><div><h2>Logs e monitoramento</h2><p>Auditoria administrativa e indicadores do processo Node.js. Logs Docker e histórico de uptime não integrados.</p></div></div><div id="monitor-services" class="infra"></div><div class="table-scroll"><table><thead><tr><th>Data (UTC)</th><th>Administrador</th><th>Ação</th><th>Referência</th></tr></thead><tbody id="audit-body"></tbody></table></div><p class="footnote">Últimos 8 eventos administrativos. Credenciais e dados de sessão não são exibidos.</p></section>
 <section data-section="settings" class="card" hidden><div class="card-heading"><div><h2>Configurações do sistema</h2><p>Estado das integrações e políticas de acesso.</p></div></div><dl class="settings-list"><div><dt>Identidade visual</dt><dd>ApexHub · Dark · Laranja #FF7F00</dd></div><div><dt>Fuso dos indicadores globais</dt><dd>UTC</dd></div><div><dt>Contas Master</dt><dd>Provisionadas exclusivamente no terminal do servidor.</dd></div><div><dt>Acessar como loja</dt><dd>Disponível · acesso temporário de até 1 hora, com auditoria e retorno ao Master.</dd></div><div><dt>Pagamentos e Docker</dt><dd>Integrações pendentes.</dd></div></dl></section>
+<section id="menu-import-section" data-section="menu-import" hidden aria-label="Importação de cardápio por IA">
+<div class="import-steps" aria-label="Etapas"><span><b>1</b> Escolha a loja</span><span><b>2</b> Envie o cardápio</span><span><b>3</b> Revise e salve</span></div>
+<div id="import-notice" class="notice" role="status" aria-live="polite" hidden></div>
+<div class="import-workspace">
+<section class="card import-setup" aria-labelledby="import-setup-title"><h2 id="import-setup-title">Loja e documento</h2><p class="muted">Selecione o estabelecimento que receberá os produtos.</p>
+<label for="import-search">Buscar loja<input id="import-search" type="search" maxlength="80" placeholder="Nome, CNPJ ou e-mail" autocomplete="off"></label>
+<label for="import-tenant">Loja de destino<select id="import-tenant"><option value="">Selecione uma loja ativa</option></select></label>
+<p id="import-stores-status" class="muted" role="status"></p><button id="import-more" type="button" class="button secondary" hidden>Carregar mais lojas</button>
+<label id="import-drop" for="import-file" class="import-drop" tabindex="0" role="button" aria-label="Selecionar ou arrastar um cardápio"><span class="import-upload-icon" aria-hidden="true">⇧</span><strong>Arraste seu cardápio aqui</strong><span>ou clique para selecionar um arquivo</span><small>JPEG / PNG até 2 MB · PDF até 5 MB</small></label>
+<input id="import-file" class="sr-only" type="file" accept="image/jpeg,image/png,application/pdf" aria-label="Arquivo do cardápio">
+<p id="import-file-name" class="import-file-name">Nenhum arquivo selecionado.</p>
+<p class="muted import-disclosure">O documento será enviado à IA para leitura. Os produtos só serão cadastrados após sua revisão e confirmação.</p>
+<button id="import-process" type="button" class="button" disabled>Processar com IA</button>
+<p id="import-progress" class="import-progress" role="status" hidden><span aria-hidden="true"></span> Lendo o cardápio… isso pode levar até um minuto.</p>
+</section>
+<section class="card import-review" aria-labelledby="import-review-title"><div class="card-heading"><div><h2 id="import-review-title">Revise antes de importar</h2><p id="import-review-store" class="muted">Sua prévia aparecerá aqui.</p></div><span id="import-count" class="badge orange">0 produtos</span></div>
+<div id="import-empty" class="import-empty"><span aria-hidden="true">▤</span><h3>Do papel para o seu cardápio</h3><p>Envie uma imagem ou PDF. Depois, ajuste categorias, nomes, descrições e preços antes de salvar na loja.</p></div>
+<div id="import-preview"></div>
+<div id="import-review-actions" hidden><button id="import-add-category" type="button" class="button secondary">+ Adicionar categoria</button><p class="muted import-hint">Preços ausentes ficam em destaque. Use vírgula ou ponto nos centavos. O lote cria novos itens e mantém o cardápio existente.</p><label class="import-check"><input id="import-reviewed" type="checkbox"><span>Conferi a loja de destino, os itens e todos os preços.</span></label><div class="import-actions"><button id="import-reset" type="button" class="button secondary">Limpar prévia</button><button id="import-save" type="button" class="button" disabled>Salvar Cardápio na Loja</button></div></div>
+<div id="import-result" class="import-result" hidden></div>
+</section></div></section>
 <footer>ApexHub <span>Master · Gestão da plataforma</span></footer></main></div>
 <dialog id="editor" aria-labelledby="editor-title"><form id="edit-form"><div class="dialog-heading"><div><p class="eyebrow">GESTÃO DE EMPRESAS</p><h2 id="editor-title">Editar empresa</h2></div><button type="button" id="close-editor" class="button secondary" aria-label="Fechar edição">×</button></div><label>Nome da empresa<input id="edit-name" required maxlength="160"></label><label>CNPJ / Identificador fiscal <span class="muted">(opcional)</span><input id="edit-cnpj" maxlength="40" autocomplete="off"><small>Identificador informado pela empresa, sem validação cadastral na Receita.</small></label><label>Status<select id="edit-active"><option value="true">Ativo</option><option value="false">Bloqueado</option></select></label><p class="notice">A suspensão bloqueia novos acessos e encerra sessões de lojistas. Pedidos e dados existentes são preservados.</p><label>Motivo da alteração<textarea id="edit-reason" required minlength="5" maxlength="500" rows="3" placeholder="Descreva o motivo para o registro de auditoria"></textarea></label><p id="edit-error" role="alert" class="error" hidden></p><div class="dialog-actions"><button type="button" id="cancel-editor" class="button secondary">Cancelar</button><button class="button" id="save-editor" type="submit">Salvar alteração</button></div></form></dialog>
 </body></html>

@@ -49,9 +49,10 @@ function createApp(db, options = {}) {
   });
   const auth = installAuth(app, db, options);
   installImpersonation(app,db,options);
-  app.use('/api/tenant/menu',require('./routes/tenant-menu').tenantMenuRouter(db,auth,app.locals.logger,{extractor:options.menuImportExtractor}));
+  const menuImportGate=require('./menu-import-ai').importGate({key:req=>req.auth.scope==='master'?'master:'+req.master.id:'tenant:'+req.tenantId});
+  app.use('/api/tenant/menu',require('./routes/tenant-menu').tenantMenuRouter(db,auth,app.locals.logger,{extractor:options.menuImportExtractor,gate:menuImportGate}));
   app.use('/api/tenant/reports',require('./advanced-reports').tenantReportsRouter(db,auth,app.locals.logger));
-  app.use('/api/admin',platformAdminRouter(db,{jwt:app.locals.jwt,prices:options.planPrices,logger:options.logger||console}));
+  app.use('/api/admin',platformAdminRouter(db,{jwt:app.locals.jwt,prices:options.planPrices,logger:options.logger||console,menuImportExtractor:options.menuImportExtractor,menuImportGate}));
   // Demais rotas administrativas exigem identidade e tenant.
   app.use('/api/admin',auth);
   installMaster(app, db, options);

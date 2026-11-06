@@ -15,20 +15,23 @@ function validateMenu(value,{preview=false}={}){
   });return {name,products};
  });return {categories,product_count:count};
 }
-async function parseUpload(req){
+function importTenantId(value){if(!['string','number'].includes(typeof value)||! /^[1-9]\d{0,9}$/.test(String(value))||Number(value)>4294967295)throw new AdminError(400,'Selecione uma loja válida.');return Number(value);}
+async function parseUpload(req,{master=false}={}){
  const contentType=req.get('content-type')||'';if(!/^multipart\/form-data\s*;/i.test(contentType))throw new AdminError(415,'Envie multipart/form-data com um arquivo no campo file.');
  if(!Buffer.isBuffer(req.body)||!req.body.length||req.body.length>MAX_UPLOAD)throw new AdminError(413,'Upload excede o limite de 6 MB.');
  let form;try{form=await new Response(req.body,{headers:{'Content-Type':contentType}}).formData();}catch{throw new AdminError(400,'Formulário multipart inválido.');}
- const entries=[...form.entries()];if(entries.length!==1||entries[0][0]!=='file'||typeof entries[0][1]==='string')throw new AdminError(400,'Envie exatamente um arquivo no campo file, sem outros campos.');
- const file=entries[0][1],bytes=Buffer.from(await file.arrayBuffer());
+ const entries=[...form.entries()],files=form.getAll('file');
+ if(files.length!==1||typeof files[0]==='string'||entries.length!==(master?2:1)||entries.some(([name])=>!['file',...(master?['tenant_id']:[])].includes(name)))throw new AdminError(400,master?'Envie um arquivo no campo file e uma loja no campo tenant_id.':'Envie exatamente um arquivo no campo file, sem outros campos.');
+ const tenantId=master?importTenantId(form.get('tenant_id')):undefined;
+ const file=files[0],bytes=Buffer.from(await file.arrayBuffer());
  if(file.type==='application/pdf'){
   if(!bytes.length||bytes.length>MAX_PDF)throw new AdminError(413,'O PDF deve ter até 5 MB.');
   if(!/^%PDF-[12]\.\d/.test(bytes.subarray(0,8).toString('ascii'))||!bytes.subarray(-2048).includes(Buffer.from('%%EOF')))throw new AdminError(422,'PDF inválido ou incompleto.');
-  return {type:'application/pdf',bytes};
+  return {type:'application/pdf',bytes,...(master?{tenantId}:{})};
  }
  if(!['image/jpeg','image/png'].includes(file.type))throw new AdminError(415,'Use JPEG, PNG ou PDF.');
  try{const info=imageInfo(bytes);if(info.type!==file.type)throw Error();}catch{throw new AdminError(422,'Imagem inválida: envie JPEG/PNG de até 2 MB, 8192 pixels por lado e 32 megapixels.');}
- return {type:file.type,bytes};
+ return {type:file.type,bytes,...(master?{tenantId}:{})};
 }
 const schema={type:'object',additionalProperties:false,required:['categories'],properties:{categories:{type:'array',items:{type:'object',additionalProperties:false,required:['name','products'],properties:{name:{type:'string'},products:{type:'array',items:{type:'object',additionalProperties:false,required:['name','description','price'],properties:{name:{type:'string'},description:{type:'string'},price:{type:['string','null']}}}}}}}}};
 async function readResponse(response){
@@ -53,10 +56,11 @@ function createExtractor({env=process.env,fetchImpl=globalThis.fetch}={}){
  };
 }
 // Limites locais por processo: memória limitada mesmo sem configuração de gateway.
-function importGate(){const attempts=new Map(),active=new Set();return (req,res,next)=>{
+function importGate({key=req=>req.tenantId}={}){const attempts=new Map(),active=new Set();return (req,res,next)=>{
  const now=Date.now();for(const [id,row]of attempts)if(row.until<=now)attempts.delete(id);
- const row=attempts.get(req.tenantId)||{count:0,until:now+15*60000};
- if(active.size>=2||active.has(req.tenantId)||row.count>=5||(!attempts.has(req.tenantId)&&attempts.size>=2000))return res.set('Retry-After','60').status(429).json({success:false,data:null,message:'Limite de importações atingido. Aguarde e tente novamente.'});
- row.count++;attempts.set(req.tenantId,row);active.add(req.tenantId);let released=false;const release=()=>{if(!released){released=true;active.delete(req.tenantId);}};req.releaseMenuImport=release;res.once('finish',release);res.once('close',()=>{if(!req.menuImportRunning)release();});next();
+ const tenantKey=key(req);
+ const row=attempts.get(tenantKey)||{count:0,until:now+15*60000};
+ if(active.size>=2||active.has(tenantKey)||row.count>=5||(!attempts.has(tenantKey)&&attempts.size>=2000))return res.set('Retry-After','60').status(429).json({success:false,data:null,message:'Limite de importações atingido. Aguarde e tente novamente.'});
+ row.count++;attempts.set(tenantKey,row);active.add(tenantKey);let released=false;const release=()=>{if(!released){released=true;active.delete(tenantKey);}};req.releaseMenuImport=release;res.once('finish',release);res.once('close',()=>{if(!req.menuImportRunning)release();});next();
  };}
-module.exports={MAX_UPLOAD,validateMenu,parseUpload,createExtractor,importGate};
+module.exports={MAX_UPLOAD,importTenantId,validateMenu,parseUpload,createExtractor,importGate};

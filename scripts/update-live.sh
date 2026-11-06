@@ -196,5 +196,5 @@ public_get /apex-tokens.css >/dev/null
 printf 'PUBLICADO\n' > "$update_dir/STATUS.txt"
 printf '%s\n' "$update_dir" > deploy/latest-update.path
 completed=true
-printf '\nATUALIZAÇÃO PUBLICADA: importação inteligente de cardápio ApexHub.\n'
+printf '\nATUALIZAÇÃO PUBLICADA: interface de importação de cardápio com IA no Master ApexHub.\n'
 printf 'Painel: https://179.198.120.188/login.html\nMaster: https://179.198.120.188/master-login.html\nBackup final: %s\nRelatório: %s\n' "$final_backup" "$update_dir"

@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const {randomUUID,randomBytes}=require('node:crypto');
 const {verifyPassword}=require('../src/security');
-async function verifyPlatformAdmin(db,request,{bearer,a}){
+async function verifyPlatformAdmin(db,request,{bearer,a,masterCookie}){
  const [[identity]]=await db.query('SELECT DATABASE() AS name');assert.match(identity.name,/_test$/);
  const slug='platform-api-'+randomUUID(),email=slug+'@example.com',password=randomUUID();
  const payload={name:'Loja criada pela API Master',slug,cnpj:'AB'+randomBytes(5).toString('hex').toUpperCase()+'00',plan_code:'starter',owner:{name:'Proprietário API',email,password}};
@@ -19,6 +19,7 @@ async function verifyPlatformAdmin(db,request,{bearer,a}){
   const {monthWindow}=require('../src/advanced-reports');const month=monthWindow();
   const [[monthOrders]]=await db.execute("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN o.status='completed' AND o.total_amount>=0 AND o.discount_amount>=0 THEN o.total_amount+o.discount_amount ELSE 0 END),0) AS gross FROM orders o JOIN companies c ON c.id=o.company_id WHERE c.active=1 AND o.created_at>=? AND o.created_at<?",[month.from,month.until]);assert.equal(global.current_month.orders,Number(monthOrders.total));assert.equal(Number(global.current_month.gross_revenue),Number(monthOrders.gross));assert.equal(global.mrr_growth_percent,null);assert.equal(global.currency,'BRL');
   assert.equal((await request('/api/admin/reports/global-financial',{headers:{Cookie:a.cookie}})).status,401);
+  await require('./master-menu-import').verifyMasterMenuImport(db,request,{bearer,masterCookie,tenantId:companyId,otherTenantId:a.id});
   const login=await request('/api/auth/login',json('POST',{email,password},{}));assert.equal(login.status,200);const ownCookie=String(login.headers['set-cookie']).split(';')[0],token=(await login.json()).access_token;assert.ok(token);
   assert.equal((await request('/api/admin/metrics',{headers:{Authorization:'Bearer '+token}})).status,401);
   const assisted=await request('/api/admin/tenants/'+companyId+'/impersonate',json('POST',{reason:'Validação de acesso assistido'}));assert.equal(assisted.status,200);const access=(await assisted.json()).data;assert.equal(access.role,'tenant_owner');assert.equal(access.tenant_id,companyId);assert.equal(access.expires_in,3600);assert.ok(access.redirect_url.includes('#token='));
