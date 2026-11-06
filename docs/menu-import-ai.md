@@ -39,3 +39,11 @@ Valida o lote inteiro antes de abrir conexão, bloqueia a empresa ativa e grava 
 ## Validação
 
 Testes locais cobrem autenticação/JWT, parsing multipart, MIME/magic, tamanho, prévia sem escrita, revisão de preço, escopo por tenant, rollback e contrato/respostas simuladas do provedor. Integração MySQL da atualização usa extração simulada (sem enviar dados ou gerar custos), verifica inserções reais e rollback provocado por CHECK do MySQL. A qualidade OCR/visão e uma chamada real dependem da chave configurada e precisam ser verificadas após a ativação.
+
+## Diagnóstico de erros do provedor
+
+`bash scripts/check-menu-ai.sh` envia uma chamada mínima de texto à Responses API usando a chave/modelo do aplicativo em execução, sem enviar o cardápio nem alterar o banco. Pode consumir poucos tokens. Não exige rebuild da imagem para executar: o script envia o código de diagnóstico por stdin ao container ativo. Exibe somente classificação conhecida, status HTTP, parâmetro estrutural e request ID válido; nunca imprime chave, documento ou mensagem bruta do provedor.
+
+O painel distingue autenticação, créditos/limites, modelo/permissão, contrato da solicitação, arquivo e indisponibilidade temporária. Logs estruturados `menu_ai_provider_failed` preservam apenas os mesmos metadados seguros. Mensagens de erro não são repassadas diretamente da OpenAI, pois podem conter dados da requisição. Referência: https://developers.openai.com/api/docs/guides/error-codes
+
+O diagnóstico mínimo aceito não garante que um PDF/imagem específico possa ser processado nem valida todo o contrato de extração; se ele passar, testar novamente o documento após a publicação e consultar a classificação da recusa. Chave/configuração não são alteradas automaticamente.

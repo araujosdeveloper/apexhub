@@ -3,7 +3,7 @@ const {AdminError,transaction,success,lockMaster}=require('../platform-admin-htt
 const {validateMenu,parseUpload,createExtractor,importTenantId}=require('../menu-import-ai');
 const {saveMenu}=require('./menu-import');
 async function target(conn,id,lock=false){const [[row]]=await conn.execute('SELECT id,name,active FROM companies WHERE id=?'+(lock?' FOR UPDATE':''),[id]);if(!row)throw new AdminError(404,'Loja não encontrada.');if(!Number(row.active))throw new AdminError(409,'A loja está suspensa. Ative-a antes de importar.');return row;}
-function createMasterMenuImportController(db,{extractor=createExtractor(),logger=console}={}){return {
+function createMasterMenuImportController(db,{extractor,logger=console}={}){extractor??=createExtractor({logger});return {
  preview:async(req,res)=>{
   req.menuImportRunning=true;let file;
   try{

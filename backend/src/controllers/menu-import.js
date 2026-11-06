@@ -1,6 +1,6 @@
 const {AdminError,transaction,success}=require('../platform-admin-http');
 const {validateMenu,parseUpload,createExtractor}=require('../menu-import-ai');
-function createMenuImportController(db,{extractor=createExtractor(),logger=console}={}){return {
+function createMenuImportController(db,{extractor,logger=console}={}){extractor??=createExtractor({logger});return {
  preview:async(req,res)=>{
   req.menuImportRunning=true;let file;try{file=await parseUpload(req);const extracted=await extractor(file),menu=validateMenu(extracted,{preview:true});success(res,{tenant_id:req.tenantId,...menu,requires_review:true,warnings:['Confira nomes, categorias e todos os preços antes de confirmar.',...(menu.categories.some(c=>c.products.some(p=>p.price===null))?['Preencha os preços ilegíveis antes de confirmar.']:[])],saved:false},'Prévia gerada. Nenhum produto foi cadastrado.');}finally{file?.bytes.fill(0);req.body=undefined;req.menuImportRunning=false;req.releaseMenuImport?.();}
  },
