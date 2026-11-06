@@ -12,28 +12,32 @@ function addAddons(schema) {
   return [...schema, ...Object.entries({ product_addons: ['product_id','config','version'], order_items: ['addons_snapshot'] }).flatMap(([table_name, names]) => names.map(column_name => ({ table_name, column_name })))];
 }
 test('atualização reconhece fundação publicada com frete legado e aplica somente módulos pendentes', () => {
-  assert.deepEqual(planUpdate(columns()).pending, ['004-store-operations.sql','005-product-addons.sql','006-coupons.sql','007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
-  assert.deepEqual(planUpdate(addOperations(columns())).pending, ['005-product-addons.sql','006-coupons.sql','007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
-  assert.deepEqual(planUpdate(addAddons(addOperations(columns()))).pending, ['006-coupons.sql','007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
+  assert.deepEqual(planUpdate(columns()).pending, ['004-store-operations.sql','005-product-addons.sql','006-coupons.sql','007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
+  assert.deepEqual(planUpdate(addOperations(columns())).pending, ['005-product-addons.sql','006-coupons.sql','007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
+  assert.deepEqual(planUpdate(addAddons(addOperations(columns()))).pending, ['006-coupons.sql','007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
   const couponColumns = { company_coupons: ['id','company_id','code','config','version','usage_count'], orders: ['coupon_code','discount_amount','coupon_snapshot','customer_phone_key'] };
   const complete = [...addAddons(addOperations(columns())), ...Object.entries(couponColumns).flatMap(([table_name, names]) => names.map(column_name => ({ table_name, column_name })))];
-  assert.deepEqual(planUpdate(complete).pending, ['007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
+  assert.deepEqual(planUpdate(complete).pending, ['007-delivery-drivers.sql','008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
   const driverColumns={delivery_drivers:['id','company_id','name','phone','active','version'],delivery_assignments:['order_id','company_id','driver_id','driver_name','driver_phone','version']};
   const all=[...complete,...Object.entries(driverColumns).flatMap(([table_name,names])=>names.map(column_name=>({table_name,column_name})))];
-  assert.deepEqual(planUpdate(all).pending,['008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
+  assert.deepEqual(planUpdate(all).pending,['008-menu-merchandising.sql','009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
   const full=[...all,...['company_id','config','version'].map(column_name=>({table_name:'company_merchandising',column_name}))];
-  assert.deepEqual(planUpdate(full).pending,['009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
+  assert.deepEqual(planUpdate(full).pending,['009-product-images.sql','010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
   const images=[...full,...['product_id','content_type','content','digest'].map(column_name=>({table_name:'product_images',column_name}))];
-  assert.deepEqual(planUpdate(images).pending,['010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
+  assert.deepEqual(planUpdate(images).pending,['010-order-tracking.sql','011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
   const tracked=[...images,...['order_id','token'].map(column_name=>({table_name:'order_tracking',column_name}))];
-  assert.deepEqual(planUpdate(tracked).pending,['011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql']);
+  assert.deepEqual(planUpdate(tracked).pending,['011-order-reviews.sql','012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
   const reviewed=[...tracked,...['order_id','rating','comment','created_at'].map(column_name=>({table_name:'order_reviews',column_name}))];
-  assert.deepEqual(planUpdate(reviewed).pending,['012-platform-master.sql','013-impersonation.sql']);
+  assert.deepEqual(planUpdate(reviewed).pending,['012-platform-master.sql','013-impersonation.sql','014-tenant-menu.sql']);
   const masterFields={platform_tenant_profiles:['company_id','cnpj'],platform_admins:['id','name','email','password_hash','active','created_at'],platform_sessions:['token_hash','admin_id','expires_at'],platform_audit:['id','admin_id','action','entity_id','details','created_at']};
   const platform=[...reviewed,...Object.entries(masterFields).flatMap(([table_name,names])=>names.map(column_name=>({table_name,column_name})))];
-  assert.deepEqual(planUpdate(platform).pending,['013-impersonation.sql']);
+  assert.deepEqual(planUpdate(platform).pending,['013-impersonation.sql','014-tenant-menu.sql']);
   const assisted=[...platform,...['id','cookie_hash','admin_id','master_session_hash','company_id','owner_id','exchanged','expires_at','created_at'].map(column_name=>({table_name:'platform_impersonations',column_name}))];
-  assert.deepEqual(planUpdate(assisted).pending,[]);
+  assert.deepEqual(planUpdate(assisted).pending,['014-tenant-menu.sql']);
+  assert.deepEqual(planUpdate([...assisted,{table_name:'products',column_name:'image_url'}]).pending,['014-tenant-menu.sql']);
+  const menu=[...assisted,{table_name:'categories',column_name:'created_at'},{table_name:'products',column_name:'created_at'},{table_name:'products',column_name:'image_url'},...['id','tenant_id','product_id','option_key','group_key','name','additional_price','max_quantity','is_active','created_at'].map(column_name=>({table_name:'product_options',column_name}))];
+  assert.deepEqual(planUpdate(menu).pending,[]);
+  assert.throws(()=>planUpdate([...assisted,{table_name:'categories',column_name:'created_at'}]),/parcial/);
   assert.throws(()=>planUpdate([...platform,{table_name:'platform_impersonations',column_name:'id'}]),/parcial/);
   assert.throws(()=>planUpdate([...reviewed,{table_name:'platform_admins',column_name:'id'}]),/parcial/);
   assert.throws(()=>planUpdate([...tracked,{table_name:'order_reviews',column_name:'order_id'}]),/parcial/);
@@ -42,7 +46,7 @@ test('atualização reconhece fundação publicada com frete legado e aplica som
   assert.throws(()=>planUpdate([...all,{table_name:'company_merchandising',column_name:'company_id'}]),/parcial/);
   assert.throws(()=>planUpdate([...complete,{table_name:'delivery_drivers',column_name:'id'}]),/parcial/);
   const unsigned = columns().map(column => ({ ...column, column_type: column.column_name === 'id' ? 'int unsigned' : column.column_type }));
-  assert.equal(planUpdate(unsigned).pending.length, 10);
+  assert.equal(planUpdate(unsigned).pending.length, 11);
 });
 test('atualização recusa legado sem fundação, migração parcial, módulos fora de ordem e tipos não ensaiados', () => {
   for (const input of [

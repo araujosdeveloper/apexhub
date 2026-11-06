@@ -126,6 +126,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  await verifyCoupons(db, request, { a, b, productId: product.id, json });
  await require('./customers').verifyCustomers(db, request, { a, b, productId: product.id });
  await require('./drivers').verifyDrivers(db,request,{a,b,orderId:variantOrder.order_id,pickupId:pickupOrder.order_id,json});
+ await require('./tenant-menu').verifyTenantMenu(db,request,{a,b});
  await require('./reports').verifyReports(db,request,{a,b,productId:product.id});
  await require('./team').verifyTeam(db,request,{a,b,json});
  await require('./merchandising').verifyMerchandising(db,request,{a,b,json});
@@ -154,7 +155,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  // Exercita o DDL em tabelas exclusivas, com dados anteriores, sem tocar nas tabelas da aplicação.
  for (const type of ['INT', 'INT UNSIGNED']) for (const existingFee of [false, true]) {
   const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
-  const names = { platform_impersonations:'mig_assisted_'+suffix,users:'mig_users_'+suffix,platform_admins:'mig_master_admins_'+suffix,platform_sessions:'mig_master_sessions_'+suffix,platform_audit:'mig_master_audit_'+suffix,platform_tenant_profiles:'mig_master_profiles_'+suffix,companies: 'mig_companies_' + suffix, orders: 'mig_orders_' + suffix, company_operations: 'mig_operations_' + suffix, products: 'mig_products_' + suffix, order_items: 'mig_items_' + suffix, product_addons: 'mig_addons_' + suffix, company_coupons: 'mig_coupons_' + suffix, delivery_drivers:'mig_drivers_'+suffix,delivery_assignments:'mig_assignments_'+suffix,company_merchandising:'mig_merch_'+suffix,product_images:'mig_images_'+suffix,order_tracking:'mig_tracking_'+suffix,order_reviews:'mig_reviews_'+suffix };
+  const names = {categories:'mig_categories_'+suffix,product_options:'mig_options_'+suffix, platform_impersonations:'mig_assisted_'+suffix,users:'mig_users_'+suffix,platform_admins:'mig_master_admins_'+suffix,platform_sessions:'mig_master_sessions_'+suffix,platform_audit:'mig_master_audit_'+suffix,platform_tenant_profiles:'mig_master_profiles_'+suffix,companies: 'mig_companies_' + suffix, orders: 'mig_orders_' + suffix, company_operations: 'mig_operations_' + suffix, products: 'mig_products_' + suffix, order_items: 'mig_items_' + suffix, product_addons: 'mig_addons_' + suffix, company_coupons: 'mig_coupons_' + suffix, delivery_drivers:'mig_drivers_'+suffix,delivery_assignments:'mig_assignments_'+suffix,company_merchandising:'mig_merch_'+suffix,product_images:'mig_images_'+suffix,order_tracking:'mig_tracking_'+suffix,order_reviews:'mig_reviews_'+suffix };
   const connection = await db.getConnection();
   try {
    await connection.query(`CREATE TABLE ${names.companies} (id ${type} PRIMARY KEY) ENGINE=InnoDB`);
@@ -214,16 +215,25 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
    await connection.query(`CREATE TABLE ${names.users}(id ${type} PRIMARY KEY) ENGINE=InnoDB`);await connection.execute(`INSERT INTO ${names.users} VALUES (1)`);
    const assistedMigration=fs.readFileSync(path.join(__dirname,'../../database/013-impersonation.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\b(companies|users|platform_admins|platform_sessions|platform_impersonations)\b/g,name=>names[name]);
    for(const sql of assistedMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
+   await connection.query(`CREATE TABLE ${names.categories}(id ${type} PRIMARY KEY,company_id ${type} NOT NULL,sort_order INT NOT NULL DEFAULT 0) ENGINE=InnoDB`);
+   await connection.query(`ALTER TABLE ${names.products} ADD company_id ${type} NOT NULL DEFAULT 1`);
+   if(existingFee){await connection.query(`ALTER TABLE ${names.products} ADD image_url VARCHAR(255) NULL`);await connection.query(`UPDATE ${names.products} SET image_url='https://images.example/legacy.jpg' WHERE id=1`);}
+   const menuMigration=fs.readFileSync(path.join(__dirname,'../../database/014-tenant-menu.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\b(companies|products|categories|product_addons|product_options)\b/g,name=>names[name]);
+   for(const sql of menuMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
+   if(existingFee){const [[oldImage]]=await connection.query(`SELECT image_url FROM ${names.products} WHERE id=1`);assert.equal(oldImage.image_url,'https://images.example/legacy.jpg');}
+   const [[menuOption]]=await connection.query(`SELECT COUNT(*) AS total FROM ${names.product_options}`);assert.equal(Number(menuOption.total),addonGroups.flatMap(group=>group.options).length);
+   await connection.query(`INSERT INTO ${names.companies} VALUES(2)`);
+   await assert.rejects(connection.query(`INSERT INTO ${names.product_options}(tenant_id,product_id,group_key,option_key,name,additional_price) VALUES (2,1,'g','foreign','Outro',1.00)`),error=>error.code==='ER_NO_REFERENCED_ROW_2');
    const [master]=await connection.execute(`INSERT INTO ${names.platform_admins}(name,email,password_hash) VALUES ('Teste','master@example.com','fixture')`);
    await connection.execute(`INSERT INTO ${names.platform_sessions}(token_hash,admin_id,expires_at) VALUES (?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR))`,['a'.repeat(64),master.insertId]);
    await connection.execute(`INSERT INTO ${names.platform_impersonations}(id,admin_id,master_session_hash,company_id,owner_id,expires_at) VALUES (?,?,?,1,1,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR))`,['b'.repeat(64),master.insertId,'a'.repeat(64)]);
    await connection.execute(`DELETE FROM ${names.platform_sessions} WHERE token_hash=?`,['a'.repeat(64)]);const [[children]]=await connection.execute(`SELECT COUNT(*) AS total FROM ${names.platform_impersonations}`);assert.equal(Number(children.total),0);
   } finally {
-   try { for (const table of [names.platform_impersonations,names.users,names.platform_tenant_profiles,names.platform_sessions,names.platform_audit,names.platform_admins,names.order_reviews,names.order_tracking,names.product_images,names.company_merchandising,names.delivery_assignments,names.delivery_drivers,names.company_coupons, names.product_addons, names.order_items, names.products, names.company_operations, names.orders, names.companies]) await connection.query(`DROP TABLE IF EXISTS ${table}`); }
+   try { for (const table of [names.product_options,names.categories,names.platform_impersonations,names.users,names.platform_tenant_profiles,names.platform_sessions,names.platform_audit,names.platform_admins,names.order_reviews,names.order_tracking,names.product_images,names.company_merchandising,names.delivery_assignments,names.delivery_drivers,names.company_coupons, names.product_addons, names.order_items, names.products, names.company_operations, names.orders, names.companies]) await connection.query(`DROP TABLE IF EXISTS ${table}`); }
    finally { connection.release(); }
   }
  }
- t.diagnostic('Migrações 004/005/006/007/008/009/010/011/012/013 preservaram pedidos, fretes e opções legadas para IDs INT e INT UNSIGNED.');
+ t.diagnostic('Migrações 004/005/006/007/008/009/010/011/012/013/014 preservaram pedidos, fretes e opções legadas para IDs INT e INT UNSIGNED.');
  const [metadata] = await db.query(fs.readFileSync(path.join(__dirname, '../../database/inventory.sql'), 'utf8'));
  const rawInventory = Object.values(metadata[0])[0];
  const inventory = typeof rawInventory === 'string' ? JSON.parse(rawInventory) : rawInventory;

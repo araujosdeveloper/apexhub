@@ -28,6 +28,9 @@ function planUpdate(columns) {
   const reviews=state([['order_reviews','order_id'],['order_reviews','rating'],['order_reviews','comment'],['order_reviews','created_at']], '011');
   const master=state([['platform_tenant_profiles','company_id'],['platform_tenant_profiles','cnpj'],['platform_admins','id'],['platform_admins','name'],['platform_admins','email'],['platform_admins','password_hash'],['platform_admins','active'],['platform_admins','created_at'],['platform_sessions','token_hash'],['platform_sessions','admin_id'],['platform_sessions','expires_at'],['platform_audit','id'],['platform_audit','admin_id'],['platform_audit','action'],['platform_audit','entity_id'],['platform_audit','details'],['platform_audit','created_at']], '012');
   const impersonation=state(['id','cookie_hash','admin_id','master_session_hash','company_id','owner_id','exchanged','expires_at','created_at'].map(field=>['platform_impersonations',field]),'013');
+  const menu=state([['categories','created_at'],['products','created_at'],...['id','tenant_id','product_id','option_key','group_key','name','additional_price','max_quantity','is_active','created_at'].map(field=>['product_options',field])],'014');
+  if(menu&&!has('products','image_url'))throw new Error('Cardápio sem coluna de imagem.');
+  if(menu&&!impersonation)throw new Error('Cardápio sem migração de acesso assistido.');
   if(impersonation&&!master)throw new Error('Acesso assistido sem migração Master.');
   if(master&&!reviews)throw new Error('Master sem migração de avaliações.');
   if(reviews&&!tracking)throw new Error('Avaliações sem acompanhamento.');
@@ -42,7 +45,7 @@ function planUpdate(columns) {
     const type = columns.find(c => c.table_name === table && c.column_name === column)?.column_type;
     if (!/^int(?:\(\d+\))?(?: unsigned)?$/i.test(type || '')) throw new Error('Tipo de ID não suportado nesta atualização: ' + table);
   }
-  return { pending: [...(!operations ? ['004-store-operations.sql'] : []), ...(!addons ? ['005-product-addons.sql'] : []), ...(!coupons ? ['006-coupons.sql'] : []), ...(!drivers ? ['007-delivery-drivers.sql'] : []), ...(!merchandising ? ['008-menu-merchandising.sql'] : []), ...(!images ? ['009-product-images.sql'] : []), ...(!tracking ? ['010-order-tracking.sql'] : []), ...(!reviews ? ['011-order-reviews.sql'] : []), ...(!master ? ['012-platform-master.sql'] : []), ...(!impersonation ? ['013-impersonation.sql'] : [])], operations, addons, coupons, drivers, merchandising, images, tracking, reviews, master, impersonation, rollback_before_open_only: true };
+  return { pending: [...(!operations ? ['004-store-operations.sql'] : []), ...(!addons ? ['005-product-addons.sql'] : []), ...(!coupons ? ['006-coupons.sql'] : []), ...(!drivers ? ['007-delivery-drivers.sql'] : []), ...(!merchandising ? ['008-menu-merchandising.sql'] : []), ...(!images ? ['009-product-images.sql'] : []), ...(!tracking ? ['010-order-tracking.sql'] : []), ...(!reviews ? ['011-order-reviews.sql'] : []), ...(!master ? ['012-platform-master.sql'] : []), ...(!impersonation ? ['013-impersonation.sql'] : []), ...(!menu ? ['014-tenant-menu.sql'] : [])], operations, addons, coupons, drivers, merchandising, images, tracking, reviews, master, impersonation, menu, rollback_before_open_only: true };
 }
 async function inspect(db) {
   const [columns] = await db.query('SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, COLUMN_TYPE AS column_type FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, ORDINAL_POSITION');

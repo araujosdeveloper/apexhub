@@ -22,7 +22,8 @@ function imageInfo(buffer){
  if(!type||!width||!height||width>8192||height>8192||width*height>32000000)throw new Error('Imagem inválida ou muito grande. Use JPG, PNG ou WebP com até 8192 pixels por lado e 32 megapixels.');
  return {type,digest:createHash('sha256').update(buffer).digest('hex')};
 }
-function withImage(product,admin=false,assistedContext=null){const {image_digest,...rest}=product;return {...rest,image_url:image_digest?`${admin?'/api/admin/products/':'/api/product-images/'}${product.id}${admin?'/image':''}?v=${image_digest}${admin&&assistedContext?'&assisted_context='+encodeURIComponent(assistedContext):''}`:null};}
+function safeImageUrl(value){try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password?url.href:null;}catch{return null;}}
+function withImage(product,admin=false,assistedContext=null){const {image_digest,...rest}=product;return {...rest,image_url:image_digest?`${admin?'/api/admin/products/':'/api/product-images/'}${product.id}${admin?'/image':''}?v=${image_digest}${admin&&assistedContext?'&assisted_context='+encodeURIComponent(assistedContext):''}`:safeImageUrl(product.image_url)};}
 function sendImage(req,res,image,admin=false){
  res.set({'Content-Type':image.content_type,'Content-Disposition':'inline','X-Content-Type-Options':'nosniff','Cache-Control':admin?'private, no-store':'public, max-age=0, must-revalidate',ETag:'"'+image.digest+'"'});
  if(!admin&&req.headers['if-none-match']==='"'+image.digest+'"')return res.status(304).end();res.send(image.content);

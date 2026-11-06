@@ -78,6 +78,11 @@ async function verifyUpgradeSmoke(db) {
   assert.equal((await request('/api/orders', json('POST', payload, null, randomUUID()))).status, 409);
   const pool={query:(...args)=>db.query(...args),execute:(...args)=>db.execute(...args),getConnection:async()=>({execute:(...args)=>db.execute(...args),beginTransaction:()=>db.beginTransaction(),commit:()=>db.commit(),rollback:()=>db.rollback(),release(){}})};
   const minted=await request('/api/auth/token',json('POST',{},cookie));assert.equal(minted.status,200);const signed=await minted.json();assert.equal(signed.role,'tenant_owner');assert.equal(signed.tenant_id,me.user.company_id);assert.equal((await request('/api/admin/catalog',{headers:{Authorization:'Bearer '+signed.access_token}})).status,200);
+  const menuApi=await request('/api/tenant/menu',{headers:{Cookie:cookie}});assert.equal(menuApi.status,200);const menuData=(await menuApi.json()).data;assert.equal(menuData.tenant_id,me.user.company_id);assert.equal(menuData.categories.find(c=>c.id===category.id).products.find(p=>p.id===product.id).options[0].name,'Queijo');
+  const menuCat=await request('/api/tenant/menu/categories',json('POST',{name:'Nova API'},cookie));assert.equal(menuCat.status,201);
+  const menuProduct=await request('/api/tenant/menu/products',json('POST',{category_id:(await menuCat.json()).data.id,name:'Novo item',price:'9.90',options:[{name:'Extra',additional_price:'1.00',max_quantity:1}]},cookie));assert.equal(menuProduct.status,201);const menuProductId=(await menuProduct.json()).data.id;
+  assert.equal((await request('/api/tenant/menu/products/'+menuProductId+'/availability',json('PUT',{is_available:false},cookie))).status,200);
+  assert.equal((await request('/api/tenant/menu/products/'+menuProductId,json('DELETE',{},cookie))).status,200);
   await require('../integration/master').verifyMaster(pool,request,{a:{id:me.user.company_id,cookie},b:{id:me.user.company_id,cookie},json});
 }
 module.exports = { verifyUpgradeSmoke };

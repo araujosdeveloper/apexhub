@@ -30,12 +30,14 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 CREATE TABLE IF NOT EXISTS categories (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id INT UNSIGNED NOT NULL,
  name VARCHAR(120) NOT NULL, sort_order INT NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT TRUE,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX menu_category_order(company_id,sort_order,id),
  UNIQUE KEY category_company (id, company_id), FOREIGN KEY (company_id) REFERENCES companies(id)
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS products (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id INT UNSIGNED NOT NULL, category_id INT UNSIGNED NOT NULL,
  name VARCHAR(160) NOT NULL, description TEXT, price DECIMAL(10,2) NOT NULL,
  active BOOLEAN NOT NULL DEFAULT TRUE, CHECK (price >= 0),
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, image_url VARCHAR(2048) NULL, UNIQUE KEY menu_product_tenant(company_id,id),
  UNIQUE KEY product_company (id, company_id),
  FOREIGN KEY (company_id) REFERENCES companies(id),
  FOREIGN KEY (category_id, company_id) REFERENCES categories(id, company_id)
@@ -43,6 +45,13 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS product_addons (
  product_id INT UNSIGNED PRIMARY KEY, config JSON NOT NULL, version INT UNSIGNED NOT NULL,
  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS product_options (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,tenant_id INT UNSIGNED NOT NULL,product_id INT UNSIGNED NOT NULL,
+ option_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,group_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ name VARCHAR(120) NOT NULL,additional_price DECIMAL(10,2) NOT NULL,max_quantity INT UNSIGNED NOT NULL DEFAULT 1,is_active BOOLEAN NOT NULL DEFAULT TRUE,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY menu_option_key(tenant_id,product_id,option_key),CHECK(additional_price>=0),CHECK(max_quantity=1),
+ FOREIGN KEY(tenant_id,product_id) REFERENCES products(company_id,id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS customers (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id INT UNSIGNED NOT NULL,

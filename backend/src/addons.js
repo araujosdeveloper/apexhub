@@ -78,6 +78,7 @@ function installAddons(app, db, auth, manage) {
       const [rows] = await conn.execute('SELECT version FROM product_addons WHERE product_id = ? FOR UPDATE', [id]);
       if (Number(rows[0]?.version || 0) !== version) { await conn.rollback(); return res.status(409).json({ error: 'Outra edição foi salva. Recarregue os adicionais antes de editar.' }); }
       await conn.execute('INSERT INTO product_addons (product_id, config, version) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE config = VALUES(config), version = VALUES(version)', [id, JSON.stringify(groups), version + 1]);
+      await require('./menu-options').syncOptions(conn,req.tenantId,id,groups);
       await conn.commit(); res.json({ groups, version: version + 1 });
     } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
   }));

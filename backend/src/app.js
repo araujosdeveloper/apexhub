@@ -49,6 +49,7 @@ function createApp(db, options = {}) {
   });
   const auth = installAuth(app, db, options);
   installImpersonation(app,db,options);
+  app.use('/api/tenant/menu',require('./routes/tenant-menu').tenantMenuRouter(db,auth,app.locals.logger));
   app.use('/api/tenant/reports',require('./advanced-reports').tenantReportsRouter(db,auth,app.locals.logger));
   app.use('/api/admin',platformAdminRouter(db,{jwt:app.locals.jwt,prices:options.planPrices,logger:options.logger||console}));
   // Demais rotas administrativas exigem identidade e tenant.
@@ -63,7 +64,7 @@ function createApp(db, options = {}) {
     if (!companies.length) return res.status(404).json({ error: 'Restaurante não encontrado.' });
     const company = companies[0];
     const [categories] = await db.execute('SELECT id, name, sort_order FROM categories WHERE company_id = ? AND active = 1 ORDER BY sort_order, id', [company.id]);
-    const [products] = await db.execute(`SELECT p.id, p.category_id, p.name, p.description, p.price, i.digest AS image_digest, a.config AS addon_config, a.version AS addon_version FROM products p LEFT JOIN product_addons a ON a.product_id = p.id
+    const [products] = await db.execute(`SELECT p.id, p.category_id, p.name, p.description, p.price, p.image_url, i.digest AS image_digest, a.config AS addon_config, a.version AS addon_version FROM products p LEFT JOIN product_addons a ON a.product_id = p.id
       LEFT JOIN product_images i ON i.product_id=p.id JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
       WHERE p.company_id = ? AND p.active = 1 AND c.active = 1 ORDER BY p.id`, [company.id]);
     const menu = await decorateMenu(db, company.id, products.map(product => withImage(publicProduct(product))));
@@ -86,7 +87,7 @@ function createApp(db, options = {}) {
   installDrivers(app, db, auth, orderEvents);
   app.get('/api/admin/catalog', auth, asyncRoute(async (req, res) => {
     const [categories] = await db.execute('SELECT id, name, sort_order, active FROM categories WHERE company_id = ? ORDER BY sort_order, id', [req.tenantId]);
-    const [products] = await db.execute('SELECT p.id,p.category_id,p.name,p.description,p.price,p.active,i.digest AS image_digest FROM products p LEFT JOIN product_images i ON i.product_id=p.id WHERE p.company_id = ? ORDER BY p.id DESC', [req.tenantId]);
+    const [products] = await db.execute('SELECT p.id,p.category_id,p.name,p.description,p.price,p.active,p.image_url,i.digest AS image_digest FROM products p LEFT JOIN product_images i ON i.product_id=p.id WHERE p.company_id = ? ORDER BY p.id DESC', [req.tenantId]);
     res.json({ categories, products: products.map(product => withImage(product,true,req.auth.impersonation?req.auth.sid:null)) });
   }));
   app.post('/api/admin/categories', auth, manage, asyncRoute(async (req, res) => {
