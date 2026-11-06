@@ -23,6 +23,17 @@ async function verifyReports(db,request,{a,b,productId}){
  assert.equal(data.fulfillment.find(row=>row.label==='delivery').active,1);
  const foreign=await get('start=2024-02-28&end=2024-02-29',b.cookie);assert.equal(Number(foreign.summary.total),999);
  const empty=await get('start=2023-01-01&end=2023-01-03');assert.equal(empty.summary.orders,0);assert.equal(empty.summary.average_order,null);assert.equal(empty.daily.length,3);assert.ok(empty.daily.every(row=>Number(row.total)===0));assert.deepEqual(empty.products,[]);
+ // Novas APIs BI usam o mesmo conjunto com limites de fuso e loja adversária.
+ const advanced=async(path,query='',cookie=a.cookie)=>{const response=await request('/api/tenant/reports/'+path+query,{headers:{Cookie:cookie}});assert.equal(response.status,200);const body=await response.json();assert.equal(body.success,true);return body.data;};
+ const bi=await advanced('summary','?start=2024-02-28&end=2024-02-29&tenant_id='+b.id);
+ assert.equal(bi.tenant_id,a.id);assert.equal(bi.summary.orders,4);assert.equal(bi.summary.completed_orders,2);assert.equal(bi.summary.cancellation_rate,25);assert.equal(Number(bi.summary.gross_revenue),52);assert.equal(Number(bi.summary.order_revenue),50);assert.equal(Number(bi.summary.average_ticket),25);assert.equal(bi.daily.length,2);assert.equal(Number(bi.daily[0].gross_revenue),22);assert.equal(Number(bi.daily[1].gross_revenue),30);
+ const biOther=await advanced('summary','?start=2024-02-28&end=2024-02-29',b.cookie);assert.equal(Number(biOther.summary.gross_revenue),999);
+ const biEmpty=await advanced('summary','?start=2023-01-01&end=2023-01-03');assert.equal(biEmpty.summary.average_ticket,null);assert.equal(biEmpty.summary.cancellation_rate,0);assert.equal(biEmpty.daily.length,3);assert.ok(biEmpty.daily.every(day=>day.orders===0&&Number(day.gross_revenue)===0));
+ await db.execute("UPDATE orders SET snapshot_source='legacy' WHERE id=? AND company_id=?",[ids[4],a.id]);
+ const origins=await advanced('origin-chart','?start=2024-02-28&end=2024-02-29');assert.equal(origins.total_orders,4);assert.equal(origins.series.find(s=>s.origin==='digital_menu').percentage,75);assert.equal(origins.series.find(s=>s.origin==='other_legacy').percentage,25);
+ const weekly=await advanced('sales-chart');assert.equal(weekly.series.length,7);
+ const [indexes]=await db.query("SHOW INDEX FROM orders WHERE Key_name='orders_company_date'");assert.deepEqual(indexes.sort((a,b)=>a.Seq_in_index-b.Seq_in_index).map(row=>row.Column_name),['company_id','created_at','id']);
+ const [plan]=await db.execute('EXPLAIN SELECT COUNT(*) FROM orders WHERE company_id=? AND created_at>=? AND created_at<?',[a.id,'2024-02-28 03:00:00','2024-03-01 03:00:00']);assert.ok(plan.some(row=>String(row.possible_keys).includes('orders_company_date')));
  // Os pedidos legados sem itens são propositais; remover antes da auditoria de checkout.
  await db.execute(`DELETE FROM order_items WHERE order_id IN (${ids.map(()=>'?').join(',')})`,ids);
  await db.execute(`DELETE FROM orders WHERE id IN (${ids.map(()=>'?').join(',')}) AND company_id IN (?,?)`,[...ids,a.id,b.id]);

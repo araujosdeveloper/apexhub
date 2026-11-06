@@ -49,6 +49,7 @@ function createApp(db, options = {}) {
   });
   const auth = installAuth(app, db, options);
   installImpersonation(app,db,options);
+  app.use('/api/tenant/reports',require('./advanced-reports').tenantReportsRouter(db,auth,app.locals.logger));
   app.use('/api/admin',platformAdminRouter(db,{jwt:app.locals.jwt,prices:options.planPrices,logger:options.logger||console}));
   // Demais rotas administrativas exigem identidade e tenant.
   app.use('/api/admin',auth);
