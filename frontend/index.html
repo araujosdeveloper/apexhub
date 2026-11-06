@@ -7,6 +7,7 @@
     <meta name="color-scheme" content="dark">
     <link rel="stylesheet" href="/apex-tokens.css">
     <link rel="stylesheet" href="/menu-theme.css">
+    <link rel="stylesheet" href="/menu-mobile.css">
 </head>
 <body class="apex-menu pb-28">
 
@@ -14,10 +15,13 @@
     <header id="header" class="menu-store-header text-center">
         <p class="menu-brand">APEXHUB · CARDÁPIO DIGITAL</p>
         <h1 id="store-name" class="text-2xl font-bold">Carregando cardápio...</h1>
-        <p id="store-status" class="menu-store-status text-sm mt-1">Aguarde um momento</p>
+        <div class="menu-header-meta"><p id="store-status" class="menu-store-status text-sm mt-1">Aguarde um momento</p><p id="store-estimate" class="menu-estimate"></p></div>
         <details class="text-sm mt-3"><summary class="cursor-pointer">Horários de atendimento</summary><p id="store-hours" class="mt-2"></p></details>
         <button type="button" onclick="location.reload()" class="text-sm underline mt-2">Atualizar disponibilidade</button>
+        <div class="menu-search" role="search"><label class="sr-only" for="menu-search">Buscar produtos no cardápio</label><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="menu-search" type="search" maxlength="80" placeholder="O que você quer pedir hoje?" autocomplete="off" oninput="searchMenu(this.value)"><button id="menu-search-clear" type="button" onclick="clearMenuSearch()" aria-label="Limpar pesquisa" hidden>×</button></div>
     </header>
+    <nav id="menu-categories" class="menu-category-tabs" aria-label="Categorias do cardápio"></nav>
+    <p id="menu-search-results" class="menu-search-results" role="status" aria-live="polite"></p>
 
     <!-- Container Principal do Cardápio -->
     <main class="menu-content mx-auto p-4" id="menu-container">
@@ -158,6 +162,10 @@
                 const operations = getOperations();
                 document.getElementById('store-status').innerText = operations.status_message;
                 document.getElementById('store-status').dataset.open = String(operations.is_open);
+                const estimates=[];
+                if(operations.delivery_enabled&&Number.isFinite(Number(operations.delivery_minutes))&&Number(operations.delivery_minutes)>0)estimates.push('Entrega · aprox. '+Number(operations.delivery_minutes)+' min');
+                if(operations.pickup_enabled&&Number.isFinite(Number(operations.pickup_minutes))&&Number(operations.pickup_minutes)>0)estimates.push('Retirada · aprox. '+Number(operations.pickup_minutes)+' min');
+                document.getElementById('store-estimate').textContent=estimates.join('  •  ');
                 const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
                 document.getElementById('store-hours').textContent = operations.mode === 'schedule'
                     ? operations.hours.map(slot => `${weekdays[slot.day]}: ${slot.start} às ${slot.end}${slot.end < slot.start ? ' do dia seguinte' : ''}`).join(' · ') + ' · Fuso: ' + operations.timezone
@@ -169,29 +177,7 @@
                 document.getElementById('delivery-zone').innerHTML = '<option value="">Escolha seu bairro</option>' + operations.zones.map((zone, index) => `<option value="${index}">${escapeHtml(zone.name)} · R$ ${Number(zone.fee).toFixed(2)}</option>`).join('');
                 updateFulfillment();
 
-                const container = document.getElementById('menu-container');
-                container.innerHTML = '';
-
-                const popular = (storeData.merchandising?.popular_ids || []).map(id => storeData.products.find(product => product.id === id)).filter(Boolean);
-                if (popular.length) container.innerHTML = '<section class="menu-category mb-6"><h2 class="text-xl font-bold mb-3">Mais vendidos nos últimos 30 dias</h2><div class="menu-product-grid">' + popular.map(menuProductCard).join('') + '</div></section>';
-                if (!storeData.products.length) container.textContent = 'O restaurante está preparando o cardápio. Volte em breve.';
-                storeData.categories.forEach(category => {
-                    const catProducts = storeData.products.filter(p => p.category_id === category.id);
-                    
-                    if (catProducts.length > 0) {
-                        let html = `
-                            <section class="menu-category mb-6">
-                                <h2 class="text-xl font-bold text-secondary border-b pb-2 mb-3">${escapeHtml(category.name)}</h2>
-                                <div class="menu-product-grid">
-                        `;
-
-                        catProducts.forEach(product => { html += menuProductCard(product); });
-
-                        html += `</div></section>`;
-                        container.innerHTML += html;
-                    }
-                });
-
+                renderMenu();
             } catch (error) {
                 console.error('Erro ao carregar o cardápio:', error);
                 document.getElementById('store-name').innerText = "Erro ao carregar o cardápio";
@@ -202,9 +188,34 @@
             const valid = order && Number.isSafeInteger(order.order_id) && order.order_id > 0 && typeof order.tracking_url === 'string' && /^\/track\.html#[a-f0-9]{64}$/.test(order.tracking_url);
             document.getElementById('order-received').innerHTML = valid ? `<div class="border border-success surface-success rounded-xl p-4"><h2 class="font-bold">Último pedido recebido: #${order.order_id}</h2><a class="text-success underline font-bold inline-block mt-2" href="${order.tracking_url}">Acompanhar meu pedido →</a></div>` : '';
         }
+        let menuSearchQuery = '', menuSectionObserver = null;
+        function normalizedMenuText(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR'); }
+        function renderMenu() {
+            const query=normalizedMenuText(menuSearchQuery.trim()),all=storeData.products||[],categories=storeData.categories||[];
+            const matching=all.filter(product=>!query||normalizedMenuText(product.name+' '+(product.description||'')+' '+(categories.find(c=>c.id===product.category_id)?.name||'')).includes(query));
+            const popular=(query?[]:(storeData.merchandising?.popular_ids||[])).map(id=>matching.find(p=>p.id===id)).filter(Boolean);
+            const sections=[];
+            if(popular.length)sections.push({id:'menu-featured',name:'Destaques',products:popular,featured:true});
+            for(const category of categories){const products=matching.filter(p=>p.category_id===category.id);if(products.length)sections.push({id:'menu-category-'+Number(category.id),name:category.name,products});}
+            const container=document.getElementById('menu-container');
+            container.innerHTML=sections.map(section=>`<section id="${section.id}" data-menu-section class="menu-category"><div class="menu-category-heading"><h2>${escapeHtml(section.name)}</h2><span>${section.products.length} ${section.products.length===1?'opção':'opções'}</span></div>${section.featured?'<p class="menu-featured-caption">Mais vendidos nos últimos 30 dias</p>':''}<div class="menu-product-grid">${section.products.map(menuProductCard).join('')}</div></section>`).join('');
+            if(!sections.length)container.innerHTML=`<div class="menu-empty"><h2>${query?'Nenhum produto encontrado':'Cardápio em preparação'}</h2><p>${query?'Tente outro nome ou limpe a pesquisa para ver todas as opções.':'A loja está preparando o cardápio. Volte em breve.'}</p></div>`;
+            const nav=document.getElementById('menu-categories');
+            nav.innerHTML=sections.map((section,index)=>`<a href="#${section.id}" data-menu-target="${section.id}" ${index===0?'aria-current="location"':''} onclick="jumpMenuCategory('${section.id}');return false">${escapeHtml(section.name)}</a>`).join('');
+            nav.hidden=!sections.length;
+            document.getElementById('menu-search-results').textContent=query?matching.length+' '+(matching.length===1?'produto encontrado':'produtos encontrados'):'';
+            document.getElementById('menu-search-clear').hidden=!menuSearchQuery;
+            menuSectionObserver?.disconnect();
+            if(typeof IntersectionObserver==='function'&&container.querySelectorAll){menuSectionObserver=new IntersectionObserver(entries=>{const visible=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top);if(visible.length)setActiveMenuCategory(visible[0].target.id);},{rootMargin:'-84px 0px -60% 0px',threshold:0});container.querySelectorAll('[data-menu-section]').forEach(section=>menuSectionObserver.observe(section));}
+        }
+        function searchMenu(value) { menuSearchQuery=String(value).slice(0,80);renderMenu(); }
+        function clearMenuSearch() { document.getElementById('menu-search').value='';searchMenu('');document.getElementById('menu-search').focus?.(); }
+        function setActiveMenuCategory(id) { document.getElementById('menu-categories').querySelectorAll?.('[data-menu-target]').forEach(link=>{if(link.dataset.menuTarget===id)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');}); }
+        function jumpMenuCategory(id) { const section=document.getElementById(id);if(!section)return;setActiveMenuCategory(id);section.scrollIntoView?.({behavior:typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}); }
         function menuProductCard(product) {
-            const image = typeof product.image_url === 'string' && /^\/api\/product-images\/\d+\?v=[a-f0-9]{64}$/.test(product.image_url) ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" class="menu-product-image" onerror="this.remove()">` : '';
-            return `<div class="menu-product">${image}<div class="menu-product-content"><h3 class="font-bold text-lg text-primary">${escapeHtml(product.name)}</h3><p class="text-sm text-secondary mt-1">${escapeHtml(product.description || '')}</p><span class="menu-price font-bold mt-2 inline-block">${(product.addon_groups || []).some(group => group.min > 0) ? 'A partir de ' : ''}R$ ${Number(product.price).toFixed(2)}</span></div><button type="button" onclick="addToCart(${Number(product.id)})" class="menu-add action-primary text-primary px-4 py-2 rounded-lg text-sm font-semibold">Adicionar</button></div>`;
+            const image = typeof product.image_url === 'string' && /^\/api\/product-images\/\d+\?v=[a-f0-9]{64}$/.test(product.image_url) ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}" width="96" height="96" loading="lazy" decoding="async" class="menu-product-image" onerror="this.remove()">` : '';
+            const placeholder='<svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="5" y="6" width="22" height="20" rx="4"/><circle cx="12" cy="13" r="2"/><path d="m6 23 7-6 4 3 5-7 5 7"/></svg>';
+            return `<article class="menu-product"><div class="menu-photo">${placeholder}${image}</div><div class="menu-product-content"><h3>${escapeHtml(product.name)}</h3><p class="menu-description">${escapeHtml(product.description || '')}</p><span class="menu-price">${(product.addon_groups || []).some(group => group.min > 0) ? 'A partir de ' : ''}${Number(product.price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div><button type="button" onclick="addToCart(${Number(product.id)})" class="menu-add action-primary" aria-label="Adicionar ${escapeHtml(product.name)} ao carrinho"><span aria-hidden="true">+</span><span class="sr-only">Adicionar</span></button></article>`;
         }
         function suggestionProducts() {
             if (storeData.merchandising?.suggestions_enabled === false || !cart.length) return [];

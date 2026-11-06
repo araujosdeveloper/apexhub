@@ -168,3 +168,15 @@ test('fotos do cardápio: aparecem em cards e sugestões, nomes escapados e URLs
 test('acompanhamento do checkout: só mostra links locais válidos e restaura último pedido da aba',async()=>{
  const link='/track.html#'+'a'.repeat(64),storage=new Map([['delivery-received:loja-a',JSON.stringify({order_id:12,tracking_url:link})]]);const page=await storefront({storage});assert.match(page.nodes.get('order-received').innerHTML,/Acompanhar meu pedido/);assert.match(page.nodes.get('order-received').innerHTML,/#12/);page.run("renderReceivedOrder({order_id:12,tracking_url:'javascript:alert(1)'})");assert.equal(page.nodes.get('order-received').innerHTML,'');
 });
+test('cardápio mobile: pesquisa local ignora acentos e mantém o carrinho ao filtrar/limpar',async()=>{
+ const page=await storefront({products:[{id:1,category_id:1,name:'Café com leite',description:'Cremoso',price:'8.00'},{id:2,category_id:1,name:'Suco',description:'Natural',price:'6.00'}]});
+ page.run("storeData.merchandising={popular_ids:[1]};addToCart(1);searchMenu('cafe')");assert.match(page.nodes.get('menu-container').innerHTML,/Café com leite/);assert.doesNotMatch(page.nodes.get('menu-container').innerHTML,/Suco/);assert.equal(page.nodes.get('menu-search-results').textContent,'1 produto encontrado');assert.doesNotMatch(page.nodes.get('menu-categories').innerHTML,/Destaques/);
+ page.run("searchMenu('produto ausente')");assert.match(page.nodes.get('menu-container').innerHTML,/Nenhum produto encontrado/);assert.equal(page.nodes.get('menu-search-results').textContent,'0 produtos encontrados');page.run('clearMenuSearch()');assert.match(page.nodes.get('menu-container').innerHTML,/Suco/);assert.equal(page.run('cart[0].quantity'),1);assert.equal(page.requests.length,0);
+});
+test('cardápio mobile: prazo real de entrega/retirada e categorias com navegação local',async()=>{
+ const page=await storefront({operations:{is_open:true,status_message:'Aberto para pedidos',delivery_enabled:true,pickup_enabled:true,delivery_minutes:35,pickup_minutes:15,zones_enabled:false,zones:[],mode:'manual'}});
+ assert.match(page.nodes.get('store-estimate').textContent,/35 min/);assert.match(page.nodes.get('store-estimate').textContent,/15 min/);assert.match(page.nodes.get('menu-categories').innerHTML,/menu-category-1/);assert.match(page.nodes.get('menu-categories').innerHTML,/Lanches/);assert.equal(page.nodes.get('store-status').dataset.open,'true');
+});
+test('cardápio mobile: link de categoria respeita preferência por movimento reduzido',async()=>{
+ const page=await storefront();let scroll;page.nodes.set('menu-category-1',{scrollIntoView:options=>{scroll=options;}});page.context.matchMedia=()=>({matches:true});page.run("jumpMenuCategory('menu-category-1')");assert.equal(scroll.behavior,'auto');assert.equal(scroll.block,'start');
+});
