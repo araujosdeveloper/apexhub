@@ -76,6 +76,7 @@ function createApp(db, options = {}) {
   installProductImages(app, db, auth, manage);
   installMerchandising(app, db, auth, manage);
   installOperations(app, db, auth, manage);
+  require('./store-profile').installStoreProfile(app,db,auth,manage);
   installAddons(app, db, auth, manage);
   installOrderBoard(app, db, auth, orderEvents);
   installOrderTracking(app, db, auth);

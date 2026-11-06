@@ -53,7 +53,7 @@ async function loadOperations(db, companyId) {
   const [rows] = await db.execute('SELECT config FROM company_operations WHERE company_id = ?', [companyId]);
   if (!rows.length) return defaults();
   const config = typeof rows[0].config === 'string' ? JSON.parse(rows[0].config) : rows[0].config;
-  return validateOperations(config);
+  return {...validateOperations(config),...(config.store_profile?{store_profile:require('./store-profile').profileInput(config.store_profile)}:{})};
 }
 function availability(config, now = new Date()) {
   let is_open = config.mode === 'open';
@@ -89,7 +89,7 @@ function installOperations(app, db, auth, manage) {
       await conn.beginTransaction();
       // Mesmo bloqueio usado no checkout: uma alteração não muda o frete no meio do pedido.
       await conn.execute('SELECT id FROM companies WHERE id = ? FOR UPDATE', [req.tenantId]);
-      await conn.execute('INSERT INTO company_operations (company_id, config) VALUES (?, ?) ON DUPLICATE KEY UPDATE config = VALUES(config)', [req.tenantId, JSON.stringify(config)]);
+      await conn.execute(`INSERT INTO company_operations (company_id, config) VALUES (?, ?) ON DUPLICATE KEY UPDATE config = IF(JSON_CONTAINS_PATH(company_operations.config, 'one', '$.store_profile'), JSON_SET(VALUES(config), '$.store_profile', JSON_EXTRACT(company_operations.config, '$.store_profile')), VALUES(config))`, [req.tenantId, JSON.stringify(config)]);
       await conn.commit();
       res.json({ operations: availability(config) });
     } catch (error) { await conn.rollback(); throw error; }

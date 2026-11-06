@@ -21,7 +21,10 @@ async function verifyUpgradeSmoke(db) {
   assert.equal((await request('/api/admin/products/' + product.id + '/addons', json('PUT', { version: 0, groups }, cookie))).status, 200);
   const operations = { ...defaults(), pickup_enabled: true, pickup_address: 'Endereço de ensaio', zones_enabled: true, zones: [{ name: 'Centro', fee: '3.00' }] };
   assert.equal((await request('/api/admin/operations', json('PUT', operations, cookie))).status, 200);
-  const menu = await (await request('/api/menu/' + slug)).json(); assert.equal(menu.products[0].addon_groups[0].options[0].name, 'Queijo');
+  const storeProfile={banner_url:'https://images.example/banner.jpg',logo_url:'https://images.example/logo.png',address:'Rua de ensaio, 10',phone:'5586999999999',notice:'Aviso do ensaio'};
+  assert.equal((await request('/api/admin/store-profile',json('PUT',storeProfile,cookie))).status,200);
+  assert.equal((await request('/api/admin/operations',json('PUT',operations,cookie))).status,200);
+  const menu = await (await request('/api/menu/' + slug)).json(); assert.equal(menu.products[0].addon_groups[0].options[0].name, 'Queijo');assert.deepEqual(menu.operations.store_profile,storeProfile);
   const payload = { company_id: me.user.company_id, customer: { name: 'Ensaio', phone: randomUUID(), street: 'Rua', number: '1', neighborhood: 'Centro' }, items: [{ product_id: product.id, quantity: 2, option_ids: ['cheese'], addon_version: 1 }], payment_method: 'Dinheiro', delivery_fee: '3.00' };
   const key = randomUUID(); const order = await request('/api/orders', json('POST', payload, null, key)); assert.equal(order.status, 201); assert.equal((await order.json()).total_amount, 28);
   assert.equal((await request('/api/orders', json('POST', payload, null, key))).status, 200);

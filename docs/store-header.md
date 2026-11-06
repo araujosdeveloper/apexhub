@@ -1,0 +1,13 @@
+# Capa, logo e informações públicas da loja
+
+No painel do lojista, abrir **Cardápio → Apresentação da loja**. Configurar links HTTPS diretos da imagem de capa e logo (sem usuário/senha no URL), endereço físico, telefone público e aviso. As imagens são referenciadas por URL; esta etapa não inclui upload de arquivos de capa/logo. As fotos de produtos continuam com seu upload próprio.
+
+O cabeçalho público mantém largura total e tema claro. Capa de 200–250 px, avatar circular sobreposto e dados reais de disponibilidade/prazo. Na ausência/falha de imagens, usa gradiente e iniciais; dados da loja continuam visíveis. Recomenda-se capa horizontal e logo quadrada. Imagens externas usam referrerpolicy=no-referrer; o navegador precisa conseguir acessar esses links.
+
+Duas colunas adaptáveis mostram contato/horários/aviso e localização. O bloco visual de localização é ilustrativo, com endereço informado e botão para abrir a busca no Google Maps; não representa mapa geocodificado ou posição GPS. O link segue Maps URLs e não exige chave adicional: https://developers.google.com/maps/documentation/urls/get-started . Sem endereço, mostra que ele não foi informado e não inventa localização. Quando o endereço público fica vazio, usa o endereço de retirada configurado. O telefone público vazio usa o WhatsApp existente da empresa.
+
+Rotas `GET` e `PUT /api/admin/store-profile`: autenticação tenant ativa e perfil owner/manager, incluindo escopo de acesso assistido. O tenant é sempre req.tenantId; campos de tenant no body são ignorados. Campos aceitos: banner_url/logo_url (até 2048 caracteres), address (320), phone (10–15 números ou vazio), notice (500). Conteúdo textual usa textContent, links/URLs são validados e não são interpretados como HTML. O servidor não baixa imagens nem executa conteúdo remoto.
+
+Os dados ficam em `company_operations.config.store_profile`, sem migração. Escritas bloqueiam a empresa e preservam os campos de operação existentes. A atualização normal da operação mantém o perfil atual no banco, mesmo se o formulário de operação estiver desatualizado; o perfil não muda taxas, horários ou endereço de retirada. A resposta pública de `/api/menu/:slug` inclui a apresentação dentro de operations.store_profile. As imagens não são gravadas no JSON.
+
+Testes locais cobrem validação, escopo, fallback de imagens, links de telefone/mapa, texto seguro e editor. A validação MySQL e o ensaio de atualização conferem a preservação cruzada de apresentação e operação usando o JSON real. A conferência visual e o acesso real às imagens externas dependem da publicação e dos URLs configurados.

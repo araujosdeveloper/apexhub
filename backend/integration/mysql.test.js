@@ -126,6 +126,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  await verifyCoupons(db, request, { a, b, productId: product.id, json });
  await require('./customers').verifyCustomers(db, request, { a, b, productId: product.id });
  await require('./drivers').verifyDrivers(db,request,{a,b,orderId:variantOrder.order_id,pickupId:pickupOrder.order_id,json});
+ await require('./store-profile').verifyStoreProfile(db,request,{a,b});
  await require('./menu-import').verifyMenuImport(db,request,{a,b});
  await require('./tenant-menu').verifyTenantMenu(db,request,{a,b});
  await require('./reports').verifyReports(db,request,{a,b,productId:product.id});
