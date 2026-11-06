@@ -3,3 +3,17 @@
 @media(min-width:640px){.menu-store-header{padding:38px 28px 24px}.menu-content{padding:10px 24px 24px}.menu-category-tabs{padding-left:24px;padding-right:24px}.menu-product{grid-template-columns:96px minmax(0,1fr) 44px;padding:18px;gap:18px;min-height:134px}.menu-photo{width:96px;height:96px}.menu-product-content h3{font-size:16px}.menu-description{font-size:12px!important}.menu-price{font-size:15px}.menu-product .menu-add,.menu-product:not(:has(.menu-product-image)) .menu-add{width:44px;height:44px;min-height:44px}.menu-search-results{padding-left:28px}}
 @media(max-width:359px){.menu-product{grid-template-columns:66px minmax(0,1fr) 44px;gap:9px;padding:12px}.menu-photo{width:66px;height:66px}.menu-product .menu-add,.menu-product:not(:has(.menu-product-image)) .menu-add{width:44px;height:44px;min-height:44px;font-size:23px}.menu-product-content h3{font-size:13px}.menu-price{font-size:12px}.menu-category-tabs a{padding-left:13px;padding-right:13px}}
 @media(prefers-reduced-motion:reduce){.menu-category-tabs a,.menu-product,.menu-add{transition:none!important}}
+/* Um único eixo de largura para header, categorias, conteúdo e carrinho. */
+:root{--menu-app-width:720px;--menu-page-padding:16px}
+html{width:100%;min-height:100%;overflow-x:hidden;background:#121212}
+body.apex-menu{width:100%;min-width:0;min-height:100vh;min-height:100dvh;margin:0;background:#121212;overflow-x:clip}
+.menu-store-header,.menu-category-tabs,.menu-search-results,.menu-content,#cart-suggestions,#order-received,#cart-notice{width:100%;min-width:0;max-width:var(--menu-app-width);margin-inline:auto;box-sizing:border-box;padding-inline:var(--menu-page-padding)}
+.menu-product-grid,.menu-product,.menu-category,.menu-category-heading,.menu-search,.menu-header-meta{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.menu-product-content,.menu-category-heading h2,.menu-header-meta>*{min-width:0;overflow-wrap:anywhere}
+.menu-search input{max-width:100%;min-width:0}
+#cart-bar{width:calc(100% - var(--menu-page-padding) - var(--menu-page-padding));max-width:calc(var(--menu-app-width) - var(--menu-page-padding) - var(--menu-page-padding));min-width:0;margin-inline:auto;box-sizing:border-box}
+#cart-bar>div{min-width:0;overflow-wrap:anywhere}
+#checkout-modal,#addons-modal{width:100%;max-width:100%;overflow-x:hidden}
+#checkout-modal>div,#addons-modal>div{min-width:0;box-sizing:border-box;overflow-wrap:anywhere}
+@media(min-width:640px){:root{--menu-page-padding:24px}}
+@media(max-width:1024px){:root{--menu-app-width:100%}}

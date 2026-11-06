@@ -56,3 +56,9 @@ body.apex-view { margin:0!important; font:14px/1.55 Inter,ui-sans-serif,-apple-s
 .apex-view .page-heading h1 { margin:0 0 7px; line-height:1.25; }
 .apex-view .content-shortcuts { display:flex; flex-wrap:wrap; gap:10px; margin:20px 0; }
 .apex-view .content-shortcuts a { border:1px solid #3a3026; background:#ff7f0009; border-radius:7px; padding:8px 12px; font-size:13px; text-decoration:none; }
+/* As views ocupam toda a área disponível dentro do shell, sem faixa lateral. */
+html.apex-view-root,body.apex-view{width:100%;min-width:0;min-height:100%;overflow-x:hidden}
+body.apex-view{min-height:100vh;background:#121212}
+.apex-view main{width:100%;min-width:0;box-sizing:border-box}
+.apex-view main>*,.apex-view .grid>*,.apex-view .charts-grid>*,.apex-view .operations-grid>*{min-width:0;max-width:100%}
+.apex-view :is(.table-scroll,.table-wrap){max-width:100%;overflow-x:auto}

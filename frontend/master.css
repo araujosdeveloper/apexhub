@@ -5,3 +5,8 @@
 @media(max-width:760px){.breadcrumb{display:block;flex:1;min-width:0;max-width:140px;overflow:hidden;text-overflow:ellipsis;font-size:0}.breadcrumb span{display:none}.breadcrumb b{font-size:11px}.profile>div{display:none}.service{max-width:105px;font-size:9px}.topbar>.button{flex-shrink:0}}
 /* Tokens de marca e dimensões compartilhados com o painel do lojista. */
 :root{--bg:var(--apex-bg,#121212);--card:var(--apex-surface,#1E1E1E);--orange:var(--apex-primary,#FF7F00);--text:var(--apex-text,#F5F5F5);--muted:var(--apex-muted,#B0B0B0);--border:var(--apex-border,#303030);--sidebar:var(--apex-sidebar-width,254px)}
+/* Limites do documento; tabelas largas rolam apenas no próprio contêiner. */
+html{width:100%;min-height:100%;overflow-x:hidden;background:#121212}
+body{width:100%;min-width:0;min-height:100vh;background:#121212;overflow-x:hidden}
+.workspace,main,.two-columns>*,.import-workspace>*{min-width:0;box-sizing:border-box}
+.table-scroll{width:100%;max-width:100%;overflow-x:auto}

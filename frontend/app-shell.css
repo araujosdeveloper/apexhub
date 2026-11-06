@@ -41,3 +41,7 @@ html, body.apex-shell { height: 100%; overflow: hidden; }
 @media(max-width:760px){.apex-shell .topbar{padding-inline:18px;min-height:120px}.assisted-banner{padding:12px 18px;flex-wrap:wrap}.assisted-banner button{width:100%}}
 @media(max-width:760px){.apex-shell .breadcrumb{order:0;flex:1;flex-basis:auto;width:auto;max-width:70px;font-size:11px}.apex-shell .topbar-actions{margin-left:auto;gap:10px}.apex-shell .store-select select{max-width:100px}.apex-shell .global-search{order:3;flex-basis:100%}}
 @media(max-width:360px){.apex-shell .breadcrumb{display:none}.apex-shell .store-select select{max-width:105px}}
+/* Mantém o painel fluido ao lado da sidebar, sem acrescentar largura à viewport. */
+html,body.apex-shell{width:100%;min-width:0;min-height:100%;background:#121212}
+.apex-shell .workspace,.apex-shell .topbar,.apex-shell .topbar-actions{min-width:0;max-width:100%;box-sizing:border-box}
+#page-view{min-width:0;max-width:100%;box-sizing:border-box}
