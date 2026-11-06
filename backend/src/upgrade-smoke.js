@@ -23,6 +23,8 @@ async function verifyUpgradeSmoke(db) {
   assert.equal((await request('/api/admin/operations', json('PUT', operations, cookie))).status, 200);
   const storeProfile={banner_url:'https://images.example/banner.jpg',logo_url:'https://images.example/logo.png',address:'Rua de ensaio, 10',phone:'5586999999999',notice:'Aviso do ensaio'};
   assert.equal((await request('/api/admin/store-profile',json('PUT',storeProfile,cookie))).status,200);
+  const coverForm=new FormData();coverForm.append('file',new Blob([require('../integration/product-images').png],{type:'image/png'}),'cover.png');const coverMultipart=new Response(coverForm);
+  const coverSaved=await request('/api/admin/store-profile/images/banner',{method:'POST',headers:{Cookie:cookie,'Content-Type':coverMultipart.headers.get('content-type')},body:Buffer.from(await coverMultipart.arrayBuffer())});assert.equal(coverSaved.status,200);storeProfile.banner_url=(await coverSaved.json()).image_url;assert.equal((await request(storeProfile.banner_url)).status,200);
   assert.equal((await request('/api/admin/operations',json('PUT',operations,cookie))).status,200);
   const menu = await (await request('/api/menu/' + slug)).json(); assert.equal(menu.products[0].addon_groups[0].options[0].name, 'Queijo');assert.deepEqual(menu.operations.store_profile,storeProfile);
   const payload = { company_id: me.user.company_id, customer: { name: 'Ensaio', phone: randomUUID(), street: 'Rua', number: '1', neighborhood: 'Centro' }, items: [{ product_id: product.id, quantity: 2, option_ids: ['cheese'], addon_version: 1 }], payment_method: 'Dinheiro', delivery_fee: '3.00' };

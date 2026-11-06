@@ -131,3 +131,9 @@ CREATE TABLE IF NOT EXISTS platform_impersonations (
  FOREIGN KEY(company_id) REFERENCES companies(id) ON DELETE CASCADE,
  FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS store_images (
+ company_id INT UNSIGNED NOT NULL,kind ENUM('banner','logo') NOT NULL,content_type VARCHAR(32) NOT NULL,
+ content MEDIUMBLOB NOT NULL,digest CHAR(64) NOT NULL,PRIMARY KEY(company_id,kind),
+ FOREIGN KEY(company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

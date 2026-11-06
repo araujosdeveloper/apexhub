@@ -27,6 +27,7 @@ async function start() {
     'SELECT id,tenant_id,product_id,option_key,group_key,name,additional_price,max_quantity,is_active,created_at FROM product_options LIMIT 0',
     'SELECT created_at,image_url FROM products LIMIT 0',
     'SELECT created_at FROM categories LIMIT 0',
+    'SELECT company_id,kind,content_type,content,digest FROM store_images LIMIT 0',
     'SELECT company_id, config FROM company_operations LIMIT 0',
     'SELECT id, name, slug, whatsapp_phone, active FROM companies LIMIT 0',
     'SELECT id, company_id, name, email, password_hash, role, active FROM users LIMIT 0',
