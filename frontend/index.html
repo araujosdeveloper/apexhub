@@ -4,40 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cardápio Digital</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="color-scheme" content="dark">
+    <link rel="stylesheet" href="/apex-tokens.css">
+    <link rel="stylesheet" href="/menu-theme.css">
 </head>
-<body class="bg-gray-50 text-gray-800 pb-28">
+<body class="apex-menu pb-28">
 
     <!-- Cabeçalho da Loja -->
-    <header id="header" class="bg-red-600 text-white p-6 shadow-md text-center">
+    <header id="header" class="menu-store-header text-center">
+        <p class="menu-brand">APEXHUB · CARDÁPIO DIGITAL</p>
         <h1 id="store-name" class="text-2xl font-bold">Carregando cardápio...</h1>
-        <p id="store-status" class="text-sm mt-1">Aguarde um momento</p>
+        <p id="store-status" class="menu-store-status text-sm mt-1">Aguarde um momento</p>
         <details class="text-sm mt-3"><summary class="cursor-pointer">Horários de atendimento</summary><p id="store-hours" class="mt-2"></p></details>
         <button type="button" onclick="location.reload()" class="text-sm underline mt-2">Atualizar disponibilidade</button>
     </header>
 
     <!-- Container Principal do Cardápio -->
-    <main class="max-w-2xl mx-auto p-4" id="menu-container">
+    <main class="menu-content mx-auto p-4" id="menu-container">
     </main>
 
     <section id="cart-suggestions" class="max-w-2xl mx-auto px-4 mb-6" aria-label="Sugestões de acompanhamentos"></section>
     <section id="order-received" class="max-w-2xl mx-auto p-4 mb-5" aria-live="polite"></section>
     <!-- Barra Flutuante do Carrinho -->
-    <div id="cart-bar" class="fixed bottom-0 left-0 right-0 bg-red-700 text-white p-4 shadow-lg hidden flex justify-between items-center max-w-2xl mx-auto rounded-t-xl">
+    <div id="cart-bar" class="fixed bottom-0 left-0 right-0 surface-card text-primary p-4 shadow-lg hidden flex justify-between items-center max-w-2xl mx-auto rounded-t-xl">
         <div>
             <span id="cart-count" class="font-bold">0 itens</span> | Produtos: <span id="cart-total" class="font-bold">R$ 0,00</span>
         </div>
-        <button onclick="openCheckout()" class="bg-white text-red-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">
+        <button onclick="openCheckout()" class="surface-card text-danger px-4 py-2 rounded-lg font-bold hover:surface-card transition">
             Ver Carrinho / Pedir
         </button>
     </div>
 
     <!-- Modal de Checkout -->
     <div id="checkout-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex justify-center items-end sm:items-center p-0 sm:p-4">
-        <div class="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div class="surface-card w-full max-w-lg rounded-t-2xl sm:rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4 border-b pb-2">
-                <h2 class="text-xl font-bold text-gray-800">Finalizar Pedido</h2>
-                <button onclick="closeCheckout()" class="text-gray-500 font-bold text-xl">&times;</button>
+                <h2 class="text-xl font-bold text-primary">Finalizar Pedido</h2>
+                <button onclick="closeCheckout()" class="text-secondary font-bold text-xl">&times;</button>
             </div>
 
             <div id="cart-items-list" class="space-y-3 mb-4 divide-y divide-gray-100">
@@ -46,65 +49,65 @@
 
             <section id="checkout-suggestions" class="mb-5" aria-label="Sugestões para o pedido"></section>
             <div class="mb-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Seu Nome:</label>
+                <label class="block text-sm font-semibold text-secondary mb-1">Seu Nome:</label>
                 <input type="text" id="customer-name" class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: João Silva">
             </div>
 
             <div class="mb-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Telefone / WhatsApp:</label>
+                <label class="block text-sm font-semibold text-secondary mb-1">Telefone / WhatsApp:</label>
                 <input type="text" id="customer-phone" class="w-full border rounded-lg p-2 text-sm" placeholder="Ex: (86) 99999-9999">
             </div>
 
             <div class="mb-4">
                 <label for="fulfillment-method" class="block text-sm font-semibold mb-1">Como deseja receber?</label>
                 <select id="fulfillment-method" onchange="updateFulfillment()" class="w-full border rounded-lg p-2"></select>
-                <p id="fulfillment-info" class="text-sm text-gray-600 mt-2"></p>
+                <p id="fulfillment-info" class="text-sm text-secondary mt-2"></p>
             </div>
             <div id="delivery-fields">
             <div class="grid grid-cols-2 gap-2 mb-4">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Rua / Av:</label>
+                    <label class="block text-sm font-semibold text-secondary mb-1">Rua / Av:</label>
                     <input type="text" id="customer-street" class="w-full border rounded-lg p-2 text-sm" placeholder="Nome da rua">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Número:</label>
+                    <label class="block text-sm font-semibold text-secondary mb-1">Número:</label>
                     <input type="text" id="customer-number" class="w-full border rounded-lg p-2 text-sm" placeholder="Nº">
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Bairro:</label>
+                <label class="block text-sm font-semibold text-secondary mb-1">Bairro:</label>
                 <input type="text" id="customer-neighborhood" oninput="updateCheckoutTotal()" class="w-full border rounded-lg p-2 text-sm" placeholder="Seu bairro">
                 <select id="delivery-zone" onchange="updateCheckoutTotal()" aria-label="Bairro atendido" class="w-full border rounded-lg p-2 text-sm hidden"></select>
             </div>
             </div>
             <div class="mb-4"><label for="coupon-code" class="block text-sm font-semibold mb-1">Cupom de desconto (opcional)</label><div class="flex gap-2"><input id="coupon-code" maxlength="32" class="w-full border rounded-lg p-2 text-sm" placeholder="Ex.: BEMVINDO10" oninput="updateCheckoutTotal()"><button id="apply-coupon" type="button" onclick="applyCoupon()" class="border rounded-lg px-3">Aplicar</button><button id="remove-coupon" type="button" onclick="removeCoupon()" class="border rounded-lg px-3">Remover</button></div><p id="coupon-message" class="text-sm mt-2" role="status" aria-live="polite"></p></div>
-            <div id="checkout-summary" role="status" aria-live="polite" class="mb-4 p-3 bg-gray-50 rounded-lg"></div>
+            <div id="checkout-summary" role="status" aria-live="polite" class="mb-4 p-3 surface-main rounded-lg"></div>
 
             <div class="mb-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Forma de Pagamento:</label>
+                <label class="block text-sm font-semibold text-secondary mb-1">Forma de Pagamento:</label>
                 <select id="payment-method" class="w-full border rounded-lg p-2 text-sm">
                     <option value="Pix">Pix</option>
                     <option value="Cartão de Crédito">Cartão de Crédito</option>
                     <option value="Dinheiro">Dinheiro (Levar Troco)</option>
                 </select>
-                <p class="text-xs text-gray-500 mt-2">A escolha informa como você pagará à loja. Não há cobrança online neste checkout.</p>
+                <p class="text-xs text-secondary mt-2">A escolha informa como você pagará à loja. Não há cobrança online neste checkout.</p>
             </div>
 
-            <button id="send-order" onclick="sendOrder()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition text-center">
+            <button id="send-order" onclick="sendOrder()" class="w-full action-primary text-primary py-3 rounded-xl font-bold hover:action-primary transition text-center">
                 Confirmar pedido
             </button>
         </div>
     </div>
 
     <div id="addons-modal" role="dialog" aria-modal="true" aria-labelledby="addons-title" class="fixed inset-0 bg-black bg-opacity-50 hidden flex justify-center items-center p-4">
-        <div class="bg-white w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div class="surface-card w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3"><h2 id="addons-title" class="text-xl font-bold"></h2><button type="button" onclick="closeAddons()" aria-label="Fechar adicionais" class="text-xl px-3">×</button></div>
-            <div id="addons-options"></div><p id="addons-error" role="status" aria-live="polite" class="text-red-700 my-3"></p>
-            <button id="confirm-addons" type="button" onclick="confirmAddons()" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold">Adicionar ao carrinho</button>
+            <div id="addons-options"></div><p id="addons-error" role="status" aria-live="polite" class="text-danger my-3"></p>
+            <button id="confirm-addons" type="button" onclick="confirmAddons()" class="w-full action-primary text-primary py-3 rounded-xl font-bold">Adicionar ao carrinho</button>
         </div>
     </div>
-    <p id="cart-notice" role="status" class="max-w-2xl mx-auto px-4 text-red-700"></p>
+    <p id="cart-notice" role="status" class="max-w-2xl mx-auto px-4 text-danger"></p>
     <!-- Script da Aplicação -->
     <script>
         const slug = new URLSearchParams(location.search).get('loja');
@@ -154,6 +157,7 @@
                 document.getElementById('store-name').innerText = storeData.company.name;
                 const operations = getOperations();
                 document.getElementById('store-status').innerText = operations.status_message;
+                document.getElementById('store-status').dataset.open = String(operations.is_open);
                 const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
                 document.getElementById('store-hours').textContent = operations.mode === 'schedule'
                     ? operations.hours.map(slot => `${weekdays[slot.day]}: ${slot.start} às ${slot.end}${slot.end < slot.start ? ' do dia seguinte' : ''}`).join(' · ') + ' · Fuso: ' + operations.timezone
@@ -169,21 +173,21 @@
                 container.innerHTML = '';
 
                 const popular = (storeData.merchandising?.popular_ids || []).map(id => storeData.products.find(product => product.id === id)).filter(Boolean);
-                if (popular.length) container.innerHTML = '<section class="mb-6"><h2 class="text-xl font-bold mb-3">Mais vendidos nos últimos 30 dias</h2><div class="space-y-3">' + popular.map(menuProductCard).join('') + '</div></section>';
+                if (popular.length) container.innerHTML = '<section class="menu-category mb-6"><h2 class="text-xl font-bold mb-3">Mais vendidos nos últimos 30 dias</h2><div class="menu-product-grid">' + popular.map(menuProductCard).join('') + '</div></section>';
                 if (!storeData.products.length) container.textContent = 'O restaurante está preparando o cardápio. Volte em breve.';
                 storeData.categories.forEach(category => {
                     const catProducts = storeData.products.filter(p => p.category_id === category.id);
                     
                     if (catProducts.length > 0) {
                         let html = `
-                            <div class="mb-6">
-                                <h2 class="text-xl font-bold text-gray-700 border-b pb-2 mb-3">${escapeHtml(category.name)}</h2>
-                                <div class="space-y-3">
+                            <section class="menu-category mb-6">
+                                <h2 class="text-xl font-bold text-secondary border-b pb-2 mb-3">${escapeHtml(category.name)}</h2>
+                                <div class="menu-product-grid">
                         `;
 
                         catProducts.forEach(product => { html += menuProductCard(product); });
 
-                        html += `</div></div>`;
+                        html += `</div></section>`;
                         container.innerHTML += html;
                     }
                 });
@@ -196,11 +200,11 @@
 
         function renderReceivedOrder(order) {
             const valid = order && Number.isSafeInteger(order.order_id) && order.order_id > 0 && typeof order.tracking_url === 'string' && /^\/track\.html#[a-f0-9]{64}$/.test(order.tracking_url);
-            document.getElementById('order-received').innerHTML = valid ? `<div class="border border-green-300 bg-green-50 rounded-xl p-4"><h2 class="font-bold">Último pedido recebido: #${order.order_id}</h2><a class="text-green-800 underline font-bold inline-block mt-2" href="${order.tracking_url}">Acompanhar meu pedido →</a></div>` : '';
+            document.getElementById('order-received').innerHTML = valid ? `<div class="border border-success surface-success rounded-xl p-4"><h2 class="font-bold">Último pedido recebido: #${order.order_id}</h2><a class="text-success underline font-bold inline-block mt-2" href="${order.tracking_url}">Acompanhar meu pedido →</a></div>` : '';
         }
         function menuProductCard(product) {
-            const image = typeof product.image_url === 'string' && /^\/api\/product-images\/\d+\?v=[a-f0-9]{64}$/.test(product.image_url) ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" class="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover shrink-0" onerror="this.remove()">` : '';
-            return `<div class="bg-white p-4 rounded-lg shadow-sm flex justify-between items-center border border-gray-100 gap-3">${image}<div class="flex-1"><h3 class="font-bold text-lg text-gray-900">${escapeHtml(product.name)}</h3><p class="text-sm text-gray-600 mt-1">${escapeHtml(product.description || '')}</p><span class="text-red-600 font-bold mt-2 inline-block">${(product.addon_groups || []).some(group => group.min > 0) ? 'A partir de ' : ''}R$ ${Number(product.price).toFixed(2)}</span></div><button type="button" onclick="addToCart(${Number(product.id)})" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Adicionar</button></div>`;
+            const image = typeof product.image_url === 'string' && /^\/api\/product-images\/\d+\?v=[a-f0-9]{64}$/.test(product.image_url) ? `<img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" class="menu-product-image" onerror="this.remove()">` : '';
+            return `<div class="menu-product">${image}<div class="menu-product-content"><h3 class="font-bold text-lg text-primary">${escapeHtml(product.name)}</h3><p class="text-sm text-secondary mt-1">${escapeHtml(product.description || '')}</p><span class="menu-price font-bold mt-2 inline-block">${(product.addon_groups || []).some(group => group.min > 0) ? 'A partir de ' : ''}R$ ${Number(product.price).toFixed(2)}</span></div><button type="button" onclick="addToCart(${Number(product.id)})" class="menu-add action-primary text-primary px-4 py-2 rounded-lg text-sm font-semibold">Adicionar</button></div>`;
         }
         function suggestionProducts() {
             if (storeData.merchandising?.suggestions_enabled === false || !cart.length) return [];
@@ -217,7 +221,7 @@
         }
         function renderSuggestions() {
             const offered = suggestionProducts();
-            const html = offered.length ? '<h2 class="font-bold text-lg mb-3">Que tal acompanhar?</h2><div class="space-y-3">' + offered.map(menuProductCard).join('') + '</div>' : '';
+            const html = offered.length ? '<h2 class="font-bold text-lg mb-3">Que tal acompanhar?</h2><div class="menu-product-grid">' + offered.map(menuProductCard).join('') + '</div>' : '';
             document.getElementById('cart-suggestions').innerHTML = html;
             document.getElementById('checkout-suggestions').innerHTML = html;
         }
@@ -318,7 +322,7 @@
             if ((product.addon_groups || []).length) {
                 customization = { product, ids: new Set() };
                 document.getElementById('addons-title').textContent = product.name;
-                document.getElementById('addons-options').innerHTML = product.addon_groups.map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-gray-600">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max}</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span><input type="checkbox" onchange="toggleAddon('${option.id}')"> ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
+                document.getElementById('addons-options').innerHTML = product.addon_groups.map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-secondary">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max}</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span><input type="checkbox" onchange="toggleAddon('${option.id}')"> ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
                 document.getElementById('addons-error').textContent = '';
                 document.getElementById('confirm-addons').textContent = `Adicionar · a partir de R$ ${Number(product.price).toFixed(2)}`;
                 document.getElementById('addons-modal').classList.remove('hidden');
@@ -382,13 +386,13 @@
                 listContainer.innerHTML += `
                     <div class="flex justify-between items-center py-2">
                         <div>
-                            <p class="font-bold text-sm">${escapeHtml(item.name)}</p><p class="text-xs text-gray-600">${(item.selected_options || []).map(option => escapeHtml(option.name) + (Number(option.price) ? " (+ R$ " + Number(option.price).toFixed(2) + ")" : "")).join(", ")}</p>
-                            <p class="text-xs text-gray-500">Qtd: ${item.quantity} x R$ ${Number(item.price).toFixed(2)}</p>
+                            <p class="font-bold text-sm">${escapeHtml(item.name)}</p><p class="text-xs text-secondary">${(item.selected_options || []).map(option => escapeHtml(option.name) + (Number(option.price) ? " (+ R$ " + Number(option.price).toFixed(2) + ")" : "")).join(", ")}</p>
+                            <p class="text-xs text-secondary">Qtd: ${item.quantity} x R$ ${Number(item.price).toFixed(2)}</p>
                             <div class="flex items-center gap-3 mt-2">
                                 <button type="button" onclick="changeQuantityByIndex(${index}, -1)" aria-label="Diminuir quantidade de ${escapeHtml(item.name)}" class="border rounded px-3 py-1">−</button>
                                 <span>${item.quantity}</span>
                                 <button type="button" onclick="changeQuantityByIndex(${index}, 1)" aria-label="Aumentar quantidade de ${escapeHtml(item.name)}" class="border rounded px-3 py-1">+</button>
-                                <button type="button" onclick="changeQuantityByIndex(${index}, -99)" class="text-red-700 text-sm">Remover</button>
+                                <button type="button" onclick="changeQuantityByIndex(${index}, -99)" class="text-danger text-sm">Remover</button>
                             </div>
                         </div>
                         <span class="font-bold text-sm">R$ ${(item.price * item.quantity).toFixed(2)}</span>

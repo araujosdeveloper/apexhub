@@ -8,7 +8,7 @@ const source = [...fs.readFileSync(path.join(__dirname, '../../frontend/index.ht
 async function storefront({ storage = new Map(), failFirst = false, operations, couponQuote = null, quoteGate = null, products = [{ id: 1, category_id: 1, name: 'Lanche', price: '12.35' }] } = {}) {
  const nodes = new Map(); const requests = []; const alerts = []; const quoteRequests = [];
  const getNode = id => {
-  if (!nodes.has(id)) nodes.set(id, { value: '', innerHTML: '', innerText: '', disabled: false, classList: { add() {}, remove() {} } });
+  if (!nodes.has(id)) nodes.set(id, { value: '', innerHTML: '', innerText: '', dataset: {}, disabled: false, classList: { add() {}, remove() {} } });
   return nodes.get(id);
  };
  for (const [id, value] of Object.entries({ 'customer-name': 'Ana', 'customer-phone': '11999999999', 'customer-street': 'Rua A', 'customer-number': '10', 'customer-neighborhood': 'Centro', 'payment-method': 'Pix' })) getNode(id).value = value;

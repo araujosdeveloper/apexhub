@@ -1,6 +1,6 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="/apex-tokens.css"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gerenciar cardápio</title>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="/apex-tokens.css"><meta name="color-scheme" content="dark"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gerenciar cardápio</title>
 <style>*{box-sizing:border-box}body{font:16px system-ui;color:#F5F5F5;background:#121212;margin:0}main{max-width:1000px;margin:40px auto;padding:0 20px}a{color:#FF7F00}h1{margin-bottom:8px}p{color:#B0B0B0}section{background:#1E1E1E;border:1px solid #303030;border-radius:12px;padding:24px;margin-top:24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}label{display:block;margin:16px 0 6px}input,textarea,select{font:inherit;width:100%;padding:10px;border:1px solid #3A3A3A;border-radius:6px}button{font:inherit;background:#FF7F00;color:white;border:0;border-radius:6px;padding:10px 16px;cursor:pointer;margin-top:16px}button:disabled{opacity:.5}article{border-top:1px solid #303030;padding:16px 0;display:flex;justify-content:space-between;align-items:center;gap:12px}article button{margin:0}#message{min-height:24px;color:#b42318}@media(max-width:700px){.grid{grid-template-columns:1fr}}
-</style><link rel="stylesheet" href="/admin-theme.css" media="screen"><script src="/assisted-context.js"></script><script src="/frame-bridge.js"></script></head><body class="apex-view apex-view-catalog"><main><h1>Cardápio</h1><p>Organize categorias, produtos, fotos e adicionais da sua loja.</p><div class="content-shortcuts"><a href="/merchandising.html">Destaques e sugestões</a></div><div id="message" role="status" aria-live="polite"></div>
+</style><link rel="stylesheet" href="/admin-theme.css" media="screen"><link rel="stylesheet" href="/catalog-theme.css"><script src="/assisted-context.js"></script><script src="/frame-bridge.js"></script></head><body class="apex-view apex-view-catalog"><main><h1>Cardápio</h1><p>Organize categorias, produtos, fotos e adicionais da sua loja.</p><header class="catalog-store-header"><p class="catalog-eyebrow">APEXHUB · SUA LOJA</p><h2 id="catalog-store-name">Seu estabelecimento</h2><span id="catalog-store-status" class="catalog-status">Carregando produtos…</span></header><div class="content-shortcuts"><a href="/merchandising.html">Destaques e sugestões</a></div><div id="message" role="status" aria-live="polite"></div>
 <div class="grid"><section><h2>Nova categoria</h2><form id="category-form"><label for="category-name">Nome</label><input id="category-name" maxlength="120" required><button>Criar categoria</button></form></section>
 <section><h2>WhatsApp da loja</h2><form id="settings-form"><label for="whatsapp">Número com código do país</label><input id="whatsapp" pattern="[0-9]{10,15}" placeholder="5586999999999"><p>Deixe vazio para desativar o encaminhamento ao WhatsApp.</p><button>Salvar WhatsApp</button></form></section></div>
 <section><h2 id="product-heading">Novo produto</h2><form id="product-form"><input type="hidden" id="product-id"><div class="grid"><div><label for="product-name">Nome</label><input id="product-name" maxlength="160" required></div><div><label for="category">Categoria</label><select id="category" required></select></div></div><label for="description">Descrição</label><textarea id="description" maxlength="4000"></textarea><label for="price">Preço em reais</label><input id="price" type="number" min="0" max="999999.99" step="0.01" required><label for="product-image">Foto do produto (opcional)</label><input id="product-image" type="file" accept="image/jpeg,image/png,image/webp"><p>Envie JPG, PNG ou WebP de até 2 MB. A foto vale para qualquer categoria: combos, bebidas, lanches e demais produtos.</p><img id="image-preview" alt="Prévia da foto do produto" hidden style="width:180px;height:140px;object-fit:cover;border-radius:8px"><label><input id="remove-image" type="checkbox" style="width:auto"> Remover a foto ao salvar</label><p id="image-message" role="status" aria-live="polite"></p><button id="save-product">Publicar produto</button> <button id="cancel-edit" type="button" hidden>Cancelar edição</button></form></section>
@@ -27,11 +27,17 @@ async function load() {
  if ([...select.options].some(o => o.value === selected)) select.value = selected;
  renderCategories(categories);
  const container = document.getElementById('products'); container.replaceChildren();
+ const available=products.filter(p=>p.active&&categories.some(c=>c.id===p.category_id&&c.active)).length;
+ document.getElementById('catalog-store-status').textContent=available+' produtos disponíveis';
+ const groups=new Map();
+ function productGroup(product){if(groups.has(product.category_id))return groups.get(product.category_id);const category=categories.find(c=>c.id===product.category_id);const section=document.createElement('section');section.className='catalog-product-category';const heading=document.createElement('h3');heading.textContent=category?category.name:'Sem categoria cadastrada';if(category&&!category.active)heading.textContent+=' · Categoria pausada';const grid=document.createElement('div');grid.className='catalog-product-grid';section.append(heading,grid);container.append(section);groups.set(product.category_id,grid);return grid;}
+ // Categorias seguem a ordem configurada; produtos mantêm sua ordem dentro do grupo.
+ for(const category of categories){const product=products.find(p=>p.category_id===category.id);if(product)productGroup(product);}
  if (!products.length) container.textContent = 'Crie uma categoria e publique seu primeiro produto.';
  for (const product of products) {
-  const row = document.createElement('article'); const text = document.createElement('span');
-  text.textContent = product.name + ' · ' + Number(product.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + (product.active ? '' : ' · Pausado');
-  const button = document.createElement('button'); button.textContent = product.active ? 'Pausar' : 'Ativar';
+  const row = document.createElement('article'); row.className='catalog-product-card';const text=document.createElement('div');text.className='catalog-product-details';
+  const title=document.createElement('h4');title.textContent=product.name;const description=document.createElement('p');description.textContent=product.description||'Sem descrição';const price=document.createElement('p');price.className='catalog-product-price';price.textContent=Number(product.price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});const status=document.createElement('span');const categoryActive=categories.some(c=>c.id===product.category_id&&c.active);status.className='catalog-status'+(product.active&&categoryActive?'':' paused');status.textContent=product.active?(categoryActive?'Disponível':'Categoria pausada'):'Pausado';text.append(title,description,price,status);
+  const button = document.createElement('button');button.className='catalog-secondary'; button.textContent = product.active ? 'Pausar' : 'Ativar';
   button.addEventListener('click', async () => {
    button.disabled = true;
    try { await api('/api/admin/products/' + product.id + '/availability', 'PATCH', { active: !product.active }); await load(); }
@@ -52,9 +58,10 @@ async function load() {
    document.getElementById('product-name').focus();
   });
   const addons = document.createElement('a'); addons.href = '/addons.html?produto=' + product.id; addons.textContent = 'Adicionais';
-  const actions = document.createElement('div'); actions.append(addons, document.createTextNode(' '), edit, document.createTextNode(' '), button);
-  if(product.image_url){const image=document.createElement('img');image.src=product.image_url;image.alt='Foto de '+product.name;image.width=64;image.height=64;image.loading='lazy';image.style.objectFit='cover';image.style.borderRadius='8px';image.onerror=()=>image.remove();row.append(image);}
-  row.append(text, actions); container.append(row);
+  const actions = document.createElement('div');actions.className='catalog-product-actions'; actions.append(addons, document.createTextNode(' '), edit, document.createTextNode(' '), button);
+  const photo=document.createElement('div');photo.className='catalog-product-photo';const fallback=document.createElement('span');fallback.textContent='Sem foto';photo.append(fallback);
+  if(product.image_url){const image=document.createElement('img');image.src=product.image_url;image.alt='Foto de '+product.name;image.width=400;image.height=250;image.loading='lazy';image.decoding='async';fallback.hidden=true;image.onerror=()=>{image.remove();fallback.hidden=false;};photo.append(image);}
+  row.append(photo,text, actions); productGroup(product).append(row);
   if(!requestedProductOpened&&product.id===requestedProduct){requestedProductOpened=true;edit.click();}
  }
 }
@@ -72,7 +79,7 @@ function renderCategories(categories) {
  const container = document.getElementById('categories'); container.replaceChildren();
  if (!categories.length) container.textContent = 'Nenhuma categoria cadastrada.';
  for (const category of categories) {
-  const form = document.createElement('form'); form.className = 'grid';
+  const form = document.createElement('form'); form.className = 'grid catalog-category-form';
   const nameLabel = document.createElement('label'); nameLabel.textContent = 'Nome da categoria';
   const name = document.createElement('input'); name.value = category.name; name.required = true; name.maxLength = 120; nameLabel.append(name);
   const orderLabel = document.createElement('label'); orderLabel.textContent = 'Ordem de exibição';
@@ -115,5 +122,5 @@ bindForm('product-form', async () => {
   resetProduct(true); await load();
  } finally { productSaving=false;window.productImageEditor.setDisabled(false); }
 });
-Promise.all([load(), api('/api/admin/settings').then(({ company }) => { document.getElementById('whatsapp').value = company.whatsapp_phone || ''; })]).catch(err => { message.textContent = err.message; });
+Promise.all([load(), api('/api/admin/settings').then(({ company }) => { document.getElementById('whatsapp').value = company.whatsapp_phone || '';document.getElementById('catalog-store-name').textContent=company.name||'Seu estabelecimento'; })]).catch(err => { message.textContent = err.message; });
 </script></body></html>
