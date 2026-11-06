@@ -48,3 +48,10 @@ test('provedor IA: configuração ausente, erros, recusa, truncamento e JSON inv
 test('importação: concorrência por tenant e falha de provedor não deixam slot ocupado',async t=>{
  let resolve;const pending=new Promise(r=>{resolve=r;}),db=fake();const r=await serve(t,db,{jwt,menuImportExtractor:async()=>{await pending;return menu;}});const upload=await multipart(pdf);const first=r('/api/tenant/menu/import-ai',{method:'POST',...upload});await new Promise(r=>setImmediate(r));const second=await r('/api/tenant/menu/import-ai',{method:'POST',...upload});assert.equal(second.status,429);resolve();assert.equal((await first).status,200);assert.equal((await r('/api/tenant/menu/import-ai',{method:'POST',...upload})).status,200);
 });
+test('importação: instância com chaves próprias precisa emitir o JWT antes do teste de rollback',async t=>{
+ const db=fake({fail:true}),otherJwt=testJwt(),r=await serve(t,db,{jwt:otherJwt,logger:{error(){}}});
+ const payload=JSON.stringify(menu);assert.equal((await r('/api/tenant/menu/confirm-import',{method:'POST',headers,body:payload})).status,401);assert.equal(db.calls.includes('begin'),false);
+ const minted=await r('/api/auth/token',{method:'POST',headers:{Cookie:'delivery_session='+'b'.repeat(64)}});assert.equal(minted.status,200);
+ const ownHeaders={'Content-Type':'application/json',Authorization:'Bearer '+(await minted.json()).access_token};
+ assert.equal((await r('/api/tenant/menu/confirm-import',{method:'POST',headers:ownHeaders,body:payload})).status,503);assert.equal(db.calls.includes('commit'),false);assert.deepEqual(db.calls.slice(-2),['rollback','release']);
+});

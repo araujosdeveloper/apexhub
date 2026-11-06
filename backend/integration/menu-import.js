@@ -15,7 +15,10 @@ async function verifyMenuImport(db,request,{a,b}){
   const {serve}=require('../test-support/http');const {testJwt}=require('../test-support/jwt');
   const failingDb={execute:(...args)=>db.execute(...args),getConnection:async()=>{const conn=await db.getConnection();return {beginTransaction:()=>conn.beginTransaction(),commit:()=>conn.commit(),rollback:()=>conn.rollback(),release:()=>conn.release(),execute:(sql,args)=>conn.execute(sql,sql.startsWith('INSERT INTO products')&&args[2]==='Falha preço'?args.map((value,i)=>i===4?'-1.00':value):args)};}};
   const failedRequest=await serve(null,failingDb,{jwt:testJwt(),logger:{error(){}}}),rollbackName=name+' rollback';
-  const failed=await failedRequest('/api/tenant/menu/confirm-import',{method:'POST',headers,body:JSON.stringify({categories:[{name:rollbackName,products:[{name:'Primeiro válido',price:'1.00'},{name:'Falha preço',price:'1.00'}]}]})});assert.equal(failed.status,500);
+  // Cada testJwt() gera chaves independentes: emitir o token nesta instância.
+  const rollbackMint=await failedRequest('/api/auth/token',{method:'POST',headers:{Cookie:a.cookie}});assert.equal(rollbackMint.status,200);
+  const rollbackHeaders={'Content-Type':'application/json',Authorization:'Bearer '+(await rollbackMint.json()).access_token};
+  const failed=await failedRequest('/api/tenant/menu/confirm-import',{method:'POST',headers:rollbackHeaders,body:JSON.stringify({categories:[{name:rollbackName,products:[{name:'Primeiro válido',price:'1.00'},{name:'Falha preço',price:'1.00'}]}]})});assert.equal(failed.status,500);
   const [[rolledBack]]=await db.execute('SELECT COUNT(*) AS total FROM categories WHERE company_id=? AND name=?',[a.id,rollbackName]);assert.equal(Number(rolledBack.total),0);
  }finally{if(categoryId){await db.execute('DELETE FROM products WHERE category_id=? AND company_id=?',[categoryId,a.id]);await db.execute('DELETE FROM categories WHERE id=? AND company_id=?',[categoryId,a.id]);}}
 }
