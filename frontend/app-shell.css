@@ -23,3 +23,21 @@ html, body.apex-shell { height: 100%; overflow: hidden; }
 @media(max-width:1250px) { .apex-shell .breadcrumb>span { display:none; } }
 @media(max-width:1000px) { .apex-shell .breadcrumb { display:inline-flex; } }
 @media(max-width:760px) { .apex-shell .breadcrumb { order:2; flex-basis:100%; width:100%; max-width:none; font-size:12px; }.apex-shell .global-search { order:3; } }
+/* Mesma geometria e tokens do Master. */
+:root{--sidebar-width:var(--apex-sidebar-width,254px);--bg:var(--apex-bg,#121212);--surface:var(--apex-surface,#1E1E1E);--primary:var(--apex-primary,#FF7F00);--text:var(--apex-text,#F5F5F5)}
+.apex-shell .workspace{grid-template-rows:auto auto minmax(0,1fr)}
+.apex-shell .topbar{grid-row:1;min-height:var(--apex-header-height,84px);padding-inline:32px;background:#121212}
+.apex-shell .view-port{grid-row:3}
+.apex-shell .sidebar{background:#121212;border-color:#303030;padding:32px 18px 24px}
+.apex-shell .brand{margin:0 8px 32px;font-size:23px}
+.apex-shell .side-nav{padding-inline:0}
+.apex-shell .nav-link{font-size:12px;padding:12px;border-radius:7px;margin:2px 0}
+.apex-shell .nav-link.active{color:#FF7F00;background:#ff7f0015;box-shadow:inset 3px 0 #FF7F00}
+.assisted-banner{grid-row:2;background:#FF7F0012;border-bottom:1px solid #FF7F0040;padding:12px 32px;display:flex;align-items:center;justify-content:space-between;gap:15px;color:#F5F5F5;font-size:12px}
+.assisted-banner strong{display:block;color:#FF7F00;font-weight:600}
+.assisted-banner span{color:#B0B0B0;font-size:11px}
+.assisted-banner button{border:1px solid #FF7F0060;background:#FF7F0015;color:#FF7F00;border-radius:7px;padding:9px 12px;font:inherit;cursor:pointer;transition:background .2s,border-color .2s}
+.assisted-banner button:hover{background:#FF7F0028;border-color:#FF7F00}
+@media(max-width:760px){.apex-shell .topbar{padding-inline:18px;min-height:120px}.assisted-banner{padding:12px 18px;flex-wrap:wrap}.assisted-banner button{width:100%}}
+@media(max-width:760px){.apex-shell .breadcrumb{order:0;flex:1;flex-basis:auto;width:auto;max-width:70px;font-size:11px}.apex-shell .topbar-actions{margin-left:auto;gap:10px}.apex-shell .store-select select{max-width:100px}.apex-shell .global-search{order:3;flex-basis:100%}}
+@media(max-width:360px){.apex-shell .breadcrumb{display:none}.apex-shell .store-select select{max-width:105px}}

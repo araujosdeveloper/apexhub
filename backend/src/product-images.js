@@ -22,7 +22,7 @@ function imageInfo(buffer){
  if(!type||!width||!height||width>8192||height>8192||width*height>32000000)throw new Error('Imagem inválida ou muito grande. Use JPG, PNG ou WebP com até 8192 pixels por lado e 32 megapixels.');
  return {type,digest:createHash('sha256').update(buffer).digest('hex')};
 }
-function withImage(product,admin=false){const {image_digest,...rest}=product;return {...rest,image_url:image_digest?`${admin?'/api/admin/products/':'/api/product-images/'}${product.id}${admin?'/image':''}?v=${image_digest}`:null};}
+function withImage(product,admin=false,assistedContext=null){const {image_digest,...rest}=product;return {...rest,image_url:image_digest?`${admin?'/api/admin/products/':'/api/product-images/'}${product.id}${admin?'/image':''}?v=${image_digest}${admin&&assistedContext?'&assisted_context='+encodeURIComponent(assistedContext):''}`:null};}
 function sendImage(req,res,image,admin=false){
  res.set({'Content-Type':image.content_type,'Content-Disposition':'inline','X-Content-Type-Options':'nosniff','Cache-Control':admin?'private, no-store':'public, max-age=0, must-revalidate',ETag:'"'+image.digest+'"'});
  if(!admin&&req.headers['if-none-match']==='"'+image.digest+'"')return res.status(304).end();res.send(image.content);
@@ -40,7 +40,7 @@ function installProductImages(app,db,auth,manage){
  app.put('/api/admin/products/:id/image',auth,manage,idCheck,express.raw({type:['image/jpeg','image/png','image/webp'],limit:MAX_BYTES}),asyncRoute(async(req,res)=>{
   let info;try{info=imageInfo(req.body);if(req.get('content-type')?.split(';')[0]!==info.type)throw new Error('O formato do arquivo não corresponde à imagem.');}catch(e){return res.status(400).json({error:e.message});}
   const conn=await db.getConnection();try{await conn.beginTransaction();const [[product]]=await conn.execute('SELECT id FROM products WHERE id=? AND company_id=? FOR UPDATE',[req.productId,req.tenantId]);if(!product){await conn.rollback();return res.status(404).json({error:'Produto não encontrado nesta loja.'});}
-   await conn.execute('INSERT INTO product_images(product_id,content_type,content,digest) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE content_type=VALUES(content_type),content=VALUES(content),digest=VALUES(digest)',[req.productId,info.type,req.body,info.digest]);await conn.commit();res.json({image_url:`/api/admin/products/${req.productId}/image?v=${info.digest}`});
+   await conn.execute('INSERT INTO product_images(product_id,content_type,content,digest) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE content_type=VALUES(content_type),content=VALUES(content),digest=VALUES(digest)',[req.productId,info.type,req.body,info.digest]);await conn.commit();res.json({image_url:withImage({id:req.productId,image_digest:info.digest},true,req.auth.impersonation?req.auth.sid:null).image_url});
   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
  }));
  app.delete('/api/admin/products/:id/image',auth,manage,idCheck,asyncRoute(async(req,res)=>{

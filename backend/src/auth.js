@@ -1,3 +1,4 @@
+const {context:assistedContext,publicContext}=require('./impersonation');
 const {roles}=require('./jwt');
 const { hashPassword, verifyPassword, sessionToken, tokenHash } = require('./security');
 const asyncRoute = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -69,11 +70,13 @@ function installAuth(app, db, { secureCookies = false } = {}) {
     }catch(e){await conn.rollback();throw e;}finally{conn.release();}
     res.cookie(cookieName,token,cookieOptions);res.json({ success: true,...access });
   }));
-  app.get('/api/auth/me', authenticate, (req, res) => res.json({ user: req.user }));
-  app.post('/api/auth/logout', asyncRoute(async (req, res) => {
+  app.get('/api/auth/me', authenticate, (req, res) => res.json({ user: req.user,...(req.auth.impersonation?{impersonation:publicContext(req.auth)}:{}) }));
+  app.post('/api/auth/logout', asyncRoute(async (req, res, next) => {
     let sid;
+    try{if(assistedContext(req))return app.locals.endImpersonation(req,res,next);}catch(e){return res.status(401).json({error:e.message});}
     if(req.headers.authorization!==undefined){
       let identity;try{identity=await resolveIdentity(db,req,'tenant',app.locals.jwt);}catch(e){if(e.status===401)return res.status(401).json({error:e.message});throw e;}
+      if(identity?.auth.impersonation)return app.locals.endImpersonation(req,res,next);
       sid=identity?.auth.sid;
     }else{const raw=cookieToken(req);if(raw)sid=tokenHash(raw);}
     if(sid)await db.execute('DELETE FROM sessions WHERE token_hash = ?',[sid]);

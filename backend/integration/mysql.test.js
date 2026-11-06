@@ -22,7 +22,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
     await db.execute('DELETE t FROM order_tracking t JOIN orders o ON t.order_id=o.id WHERE o.company_id=?',[id]);
     await db.execute('DELETE i FROM product_images i JOIN products p ON i.product_id=p.id WHERE p.company_id=?',[id]);
     await db.execute('DELETE a FROM product_addons a JOIN products p ON a.product_id = p.id WHERE p.company_id = ?', [id]);
-    for (const table of ['platform_tenant_profiles', 'company_merchandising', 'delivery_assignments', 'delivery_drivers', 'orders', 'customers', 'products', 'categories', 'subscriptions', 'company_operations', 'company_coupons']) await db.execute(`DELETE FROM ${table} WHERE company_id = ?`, [id]);
+    for (const table of ['platform_impersonations','platform_tenant_profiles', 'company_merchandising', 'delivery_assignments', 'delivery_drivers', 'orders', 'customers', 'products', 'categories', 'subscriptions', 'company_operations', 'company_coupons']) await db.execute(`DELETE FROM ${table} WHERE company_id = ?`, [id]);
     await db.execute('DELETE s FROM sessions s JOIN users u ON u.id = s.user_id WHERE u.company_id = ?', [id]);
     await db.execute('DELETE FROM users WHERE company_id = ?', [id]);
     await db.execute('DELETE FROM companies WHERE id = ?', [id]);
@@ -137,6 +137,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  t.diagnostic('JWT/RBAC: emissão, claims, tenant, IDOR, perfis e revogação aprovados.');
  await require('./master').verifyMaster(db,request,{a,b,json});
  t.diagnostic('Master: autenticação exclusiva, busca, revisão, suspensão, sessões e auditoria aprovados.');
+ t.diagnostic('Acesso assistido: emissão, troca única, imagens, isolamento, suspensão e revogação pelo Master aprovados.');
  t.diagnostic('API Super Admin: cadastro transacional, paginação, status, revogação, métricas e restrição de perfil aprovados.');
  t.diagnostic('ApexHub: indicadores, receita bruta, origem, busca e isolamento aprovados.');
  t.diagnostic('Avaliações: conclusão, nota, idempotência, concorrência e isolamento aprovados.');
@@ -153,7 +154,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  // Exercita o DDL em tabelas exclusivas, com dados anteriores, sem tocar nas tabelas da aplicação.
  for (const type of ['INT', 'INT UNSIGNED']) for (const existingFee of [false, true]) {
   const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
-  const names = { platform_admins:'mig_master_admins_'+suffix,platform_sessions:'mig_master_sessions_'+suffix,platform_audit:'mig_master_audit_'+suffix,platform_tenant_profiles:'mig_master_profiles_'+suffix,companies: 'mig_companies_' + suffix, orders: 'mig_orders_' + suffix, company_operations: 'mig_operations_' + suffix, products: 'mig_products_' + suffix, order_items: 'mig_items_' + suffix, product_addons: 'mig_addons_' + suffix, company_coupons: 'mig_coupons_' + suffix, delivery_drivers:'mig_drivers_'+suffix,delivery_assignments:'mig_assignments_'+suffix,company_merchandising:'mig_merch_'+suffix,product_images:'mig_images_'+suffix,order_tracking:'mig_tracking_'+suffix,order_reviews:'mig_reviews_'+suffix };
+  const names = { platform_impersonations:'mig_assisted_'+suffix,users:'mig_users_'+suffix,platform_admins:'mig_master_admins_'+suffix,platform_sessions:'mig_master_sessions_'+suffix,platform_audit:'mig_master_audit_'+suffix,platform_tenant_profiles:'mig_master_profiles_'+suffix,companies: 'mig_companies_' + suffix, orders: 'mig_orders_' + suffix, company_operations: 'mig_operations_' + suffix, products: 'mig_products_' + suffix, order_items: 'mig_items_' + suffix, product_addons: 'mig_addons_' + suffix, company_coupons: 'mig_coupons_' + suffix, delivery_drivers:'mig_drivers_'+suffix,delivery_assignments:'mig_assignments_'+suffix,company_merchandising:'mig_merch_'+suffix,product_images:'mig_images_'+suffix,order_tracking:'mig_tracking_'+suffix,order_reviews:'mig_reviews_'+suffix };
   const connection = await db.getConnection();
   try {
    await connection.query(`CREATE TABLE ${names.companies} (id ${type} PRIMARY KEY) ENGINE=InnoDB`);
@@ -210,12 +211,19 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
    const masterMigration=fs.readFileSync(path.join(__dirname,'../../database/012-platform-master.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\b(companies|platform_admins|platform_sessions|platform_audit|platform_tenant_profiles)\b/g,name=>names[name]);
    for(const sql of masterMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
    await connection.execute(`INSERT INTO ${names.platform_tenant_profiles}(company_id,cnpj) VALUES (1,'MASTERTEST')`);
+   await connection.query(`CREATE TABLE ${names.users}(id ${type} PRIMARY KEY) ENGINE=InnoDB`);await connection.execute(`INSERT INTO ${names.users} VALUES (1)`);
+   const assistedMigration=fs.readFileSync(path.join(__dirname,'../../database/013-impersonation.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\b(companies|users|platform_admins|platform_sessions|platform_impersonations)\b/g,name=>names[name]);
+   for(const sql of assistedMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
+   const [master]=await connection.execute(`INSERT INTO ${names.platform_admins}(name,email,password_hash) VALUES ('Teste','master@example.com','fixture')`);
+   await connection.execute(`INSERT INTO ${names.platform_sessions}(token_hash,admin_id,expires_at) VALUES (?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR))`,['a'.repeat(64),master.insertId]);
+   await connection.execute(`INSERT INTO ${names.platform_impersonations}(id,admin_id,master_session_hash,company_id,owner_id,expires_at) VALUES (?,?,?,1,1,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR))`,['b'.repeat(64),master.insertId,'a'.repeat(64)]);
+   await connection.execute(`DELETE FROM ${names.platform_sessions} WHERE token_hash=?`,['a'.repeat(64)]);const [[children]]=await connection.execute(`SELECT COUNT(*) AS total FROM ${names.platform_impersonations}`);assert.equal(Number(children.total),0);
   } finally {
-   try { for (const table of [names.platform_tenant_profiles,names.platform_sessions,names.platform_audit,names.platform_admins,names.order_reviews,names.order_tracking,names.product_images,names.company_merchandising,names.delivery_assignments,names.delivery_drivers,names.company_coupons, names.product_addons, names.order_items, names.products, names.company_operations, names.orders, names.companies]) await connection.query(`DROP TABLE IF EXISTS ${table}`); }
+   try { for (const table of [names.platform_impersonations,names.users,names.platform_tenant_profiles,names.platform_sessions,names.platform_audit,names.platform_admins,names.order_reviews,names.order_tracking,names.product_images,names.company_merchandising,names.delivery_assignments,names.delivery_drivers,names.company_coupons, names.product_addons, names.order_items, names.products, names.company_operations, names.orders, names.companies]) await connection.query(`DROP TABLE IF EXISTS ${table}`); }
    finally { connection.release(); }
   }
  }
- t.diagnostic('Migrações 004/005/006/007/008/009/010/011/012 preservaram pedidos, fretes e opções legadas para IDs INT e INT UNSIGNED.');
+ t.diagnostic('Migrações 004/005/006/007/008/009/010/011/012/013 preservaram pedidos, fretes e opções legadas para IDs INT e INT UNSIGNED.');
  const [metadata] = await db.query(fs.readFileSync(path.join(__dirname, '../../database/inventory.sql'), 'utf8'));
  const rawInventory = Object.values(metadata[0])[0];
  const inventory = typeof rawInventory === 'string' ? JSON.parse(rawInventory) : rawInventory;

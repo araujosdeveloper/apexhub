@@ -27,6 +27,8 @@ function planUpdate(columns) {
   const tracking=state([['order_tracking','order_id'],['order_tracking','token']], '010');
   const reviews=state([['order_reviews','order_id'],['order_reviews','rating'],['order_reviews','comment'],['order_reviews','created_at']], '011');
   const master=state([['platform_tenant_profiles','company_id'],['platform_tenant_profiles','cnpj'],['platform_admins','id'],['platform_admins','name'],['platform_admins','email'],['platform_admins','password_hash'],['platform_admins','active'],['platform_admins','created_at'],['platform_sessions','token_hash'],['platform_sessions','admin_id'],['platform_sessions','expires_at'],['platform_audit','id'],['platform_audit','admin_id'],['platform_audit','action'],['platform_audit','entity_id'],['platform_audit','details'],['platform_audit','created_at']], '012');
+  const impersonation=state(['id','cookie_hash','admin_id','master_session_hash','company_id','owner_id','exchanged','expires_at','created_at'].map(field=>['platform_impersonations',field]),'013');
+  if(impersonation&&!master)throw new Error('Acesso assistido sem migração Master.');
   if(master&&!reviews)throw new Error('Master sem migração de avaliações.');
   if(reviews&&!tracking)throw new Error('Avaliações sem acompanhamento.');
   if(tracking&&!images)throw new Error('Acompanhamento sem migração de imagens.');
@@ -40,7 +42,7 @@ function planUpdate(columns) {
     const type = columns.find(c => c.table_name === table && c.column_name === column)?.column_type;
     if (!/^int(?:\(\d+\))?(?: unsigned)?$/i.test(type || '')) throw new Error('Tipo de ID não suportado nesta atualização: ' + table);
   }
-  return { pending: [...(!operations ? ['004-store-operations.sql'] : []), ...(!addons ? ['005-product-addons.sql'] : []), ...(!coupons ? ['006-coupons.sql'] : []), ...(!drivers ? ['007-delivery-drivers.sql'] : []), ...(!merchandising ? ['008-menu-merchandising.sql'] : []), ...(!images ? ['009-product-images.sql'] : []), ...(!tracking ? ['010-order-tracking.sql'] : []), ...(!reviews ? ['011-order-reviews.sql'] : []), ...(!master ? ['012-platform-master.sql'] : [])], operations, addons, coupons, drivers, merchandising, images, tracking, reviews, master, rollback_before_open_only: true };
+  return { pending: [...(!operations ? ['004-store-operations.sql'] : []), ...(!addons ? ['005-product-addons.sql'] : []), ...(!coupons ? ['006-coupons.sql'] : []), ...(!drivers ? ['007-delivery-drivers.sql'] : []), ...(!merchandising ? ['008-menu-merchandising.sql'] : []), ...(!images ? ['009-product-images.sql'] : []), ...(!tracking ? ['010-order-tracking.sql'] : []), ...(!reviews ? ['011-order-reviews.sql'] : []), ...(!master ? ['012-platform-master.sql'] : []), ...(!impersonation ? ['013-impersonation.sql'] : [])], operations, addons, coupons, drivers, merchandising, images, tracking, reviews, master, impersonation, rollback_before_open_only: true };
 }
 async function inspect(db) {
   const [columns] = await db.query('SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, COLUMN_TYPE AS column_type FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, ORDINAL_POSITION');

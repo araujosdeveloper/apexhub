@@ -1,3 +1,4 @@
+const {installImpersonation}=require('./impersonation');
 const {platformAdminRouter}=require('./routes/platform-admin');
 const {isPlatformAdminPath,responseEnvelope}=require('./platform-admin-http');
 const {configuration}=require('./jwt');
@@ -26,6 +27,7 @@ const { checkoutHash, reserveCheckout } = require('./checkout');
 const { loadOperations, availability, quoteDelivery, installOperations } = require('./operations');
 function createApp(db, options = {}) {
   const app = express();
+  app.locals.logger=options.logger||console;
   app.locals.jwt=options.jwt===undefined?configuration():options.jwt;
   const orderEvents = options.orderEvents || createOrderEvents();
   app.locals.orderEvents = orderEvents;
@@ -46,6 +48,7 @@ function createApp(db, options = {}) {
     next();
   });
   const auth = installAuth(app, db, options);
+  installImpersonation(app,db,options);
   app.use('/api/admin',platformAdminRouter(db,{jwt:app.locals.jwt,prices:options.planPrices,logger:options.logger||console}));
   // Demais rotas administrativas exigem identidade e tenant.
   app.use('/api/admin',auth);
@@ -83,7 +86,7 @@ function createApp(db, options = {}) {
   app.get('/api/admin/catalog', auth, asyncRoute(async (req, res) => {
     const [categories] = await db.execute('SELECT id, name, sort_order, active FROM categories WHERE company_id = ? ORDER BY sort_order, id', [req.tenantId]);
     const [products] = await db.execute('SELECT p.id,p.category_id,p.name,p.description,p.price,p.active,i.digest AS image_digest FROM products p LEFT JOIN product_images i ON i.product_id=p.id WHERE p.company_id = ? ORDER BY p.id DESC', [req.tenantId]);
-    res.json({ categories, products: products.map(product => withImage(product,true)) });
+    res.json({ categories, products: products.map(product => withImage(product,true,req.auth.impersonation?req.auth.sid:null)) });
   }));
   app.post('/api/admin/categories', auth, manage, asyncRoute(async (req, res) => {
     const name = req.body?.name;

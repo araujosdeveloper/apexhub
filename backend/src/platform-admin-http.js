@@ -1,5 +1,5 @@
 const {randomUUID}=require('node:crypto');
-const isPlatformAdminPath=path=>/^\/api\/admin\/(?:tenants|metrics)(?:\/|$)/i.test(path);
+const isPlatformAdminPath=path=>/^\/api\/admin\/(?:tenants|metrics)(?:\/|$)/i.test(path)||/^\/api\/auth\/impersonation(?:\/|$)/i.test(path);
 class AdminError extends Error{constructor(status,message){super(message);this.status=status;}}
 function responseEnvelope(req,res,next){
  req.requestId=randomUUID();res.set({'X-Request-ID':req.requestId,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'});
@@ -13,6 +13,9 @@ function safeLog(logger,req,event,error){
 }
 function adminErrorHandler(logger=console){return (error,req,res,next)=>{
  if(res.headersSent)return next(error);
+ if(error.type==='entity.parse.failed')return res.status(400).json({success:false,data:null,message:'JSON inválido.'});
+ if(error.type==='entity.too.large')return res.status(413).json({success:false,data:null,message:'Requisição muito grande.'});
+ if(error instanceof require('./jwt').InvalidToken)return res.status(401).json({success:false,data:null,message:error.message});
  if(error instanceof AdminError)return res.status(error.status).json({success:false,data:null,message:error.message});
  if(error.code==='ER_DUP_ENTRY')return res.status(409).json({success:false,data:null,message:'E-mail, CNPJ ou endereço da loja já cadastrado.'});
  safeLog(logger,req,'platform_admin_request_failed',error);

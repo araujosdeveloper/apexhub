@@ -55,7 +55,7 @@ function createPlatformAdminController(db,{prices,logger=console}){
     await lockMaster(conn,req);
     const [[company]]=await conn.execute('SELECT id,active FROM companies WHERE id=? FOR UPDATE',[id]);if(!company)throw new AdminError(404,'Empresa não encontrada.');
     await conn.execute('UPDATE companies SET active=? WHERE id=?',[active,id]);
-    if(!active)await conn.execute('DELETE s FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.company_id=?',[id]);
+    if(!active){await conn.execute('DELETE s FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.company_id=?',[id]);await conn.execute('DELETE FROM platform_impersonations WHERE company_id=?',[id]);}
     await conn.execute('INSERT INTO platform_audit(admin_id,action,entity_id,details) VALUES (?,?,?,?)',[req.master.id,active?'tenant_activated':'tenant_suspended',String(id),JSON.stringify({before:{active:Number(company.active)===1},after:{active},reason})]);
     return {id,status:body.status,active,sessions_revoked:!active};
    });success(res,data,active?'Empresa ativada.':'Empresa suspensa e sessões revogadas.');

@@ -4,7 +4,7 @@ const {asyncRoute}=require('./auth');
 const {verifyPassword,sessionToken,tokenHash}=require('./security');
 const {utcDate}=require('./order-board');
 const cookieName='apex_master_session';
-const capabilities={assisted_access:false,billing:false,docker:false,cnpj:true};
+const capabilities={assisted_access:true,billing:false,docker:false,cnpj:true};
 function tenantRevision(row){return createHash('sha256').update(JSON.stringify([row.id,row.name,row.slug,Number(row.active),row.cnpj||null])).digest('hex');}
 function tenantInput(body){if(!body||typeof body.name!=='string'||!body.name.trim()||body.name.trim().length>160||typeof body.active!=='boolean'||typeof body.revision!=='string'||!/^[a-f0-9]{64}$/.test(body.revision)||typeof body.reason!=='string'||body.reason.trim().length<5||body.reason.length>500)throw new Error('Informe nome, status, versão e motivo de 5 a 500 caracteres.');if(body.cnpj!==undefined&&body.cnpj!==null&&typeof body.cnpj!=='string')throw new Error('Identificador fiscal inválido.');const cnpj=typeof body.cnpj==='string'?body.cnpj.trim().toUpperCase().replace(/[.\/\s-]/g,''):null;if(cnpj&&!/^[A-Z0-9]{1,32}$/.test(cnpj))throw new Error('Informe um identificador fiscal com até 32 letras ou números.');return {cnpj:cnpj||null,name:body.name.trim(),active:body.active,reason:body.reason.trim(),revision:body.revision};}
 function installMaster(app,db,{secureCookies=false}={}){
@@ -57,7 +57,7 @@ function installMaster(app,db,{secureCookies=false}={}){
    if(tenantRevision(company)!==input.revision){await conn.rollback();return res.status(409).json({error:'A empresa mudou. Atualize antes de editar.'});}
    await conn.execute('UPDATE companies SET name=?,active=? WHERE id=?',[input.name,input.active,id]);
    if(profile)await conn.execute('UPDATE platform_tenant_profiles SET cnpj=? WHERE company_id=?',[input.cnpj,id]);else await conn.execute('INSERT INTO platform_tenant_profiles(company_id,cnpj) VALUES (?,?)',[id,input.cnpj]);
-   if(!input.active)await conn.execute('DELETE s FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.company_id=?',[id]);
+   if(!input.active){await conn.execute('DELETE s FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.company_id=?',[id]);await conn.execute('DELETE FROM platform_impersonations WHERE company_id=?',[id]);}
    await conn.execute("INSERT INTO platform_audit(admin_id,action,entity_id,details) VALUES (?,?,?,?)",[req.master.id,input.active?'tenant_updated':'tenant_suspended',String(id),JSON.stringify({before:{name:company.name,cnpj:company.cnpj,active:Number(company.active)===1},after:{name:input.name,cnpj:input.cnpj,active:input.active},reason:input.reason})]);
    await conn.commit();res.json({ok:true});
   }catch(e){await conn.rollback();if(e.code==='ER_DUP_ENTRY')return res.status(409).json({error:'Identificador fiscal já cadastrado em outra empresa.'});throw e;}finally{conn.release();}

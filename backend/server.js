@@ -18,6 +18,7 @@ async function start() {
   await db.execute('SELECT 1');
   // Falha antes de aceitar tráfego quando o banco ainda não recebeu a migração.
   for (const sql of [
+    'SELECT id,cookie_hash,admin_id,master_session_hash,company_id,owner_id,exchanged,expires_at FROM platform_impersonations LIMIT 0',
     'SELECT id,name,email,password_hash,active FROM platform_admins LIMIT 0',
     'SELECT token_hash,admin_id,expires_at FROM platform_sessions LIMIT 0',
     'SELECT id,admin_id,action,entity_id,details FROM platform_audit LIMIT 0',

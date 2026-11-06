@@ -112,3 +112,13 @@ CREATE TABLE IF NOT EXISTS platform_audit (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS platform_tenant_profiles (company_id INT UNSIGNED PRIMARY KEY, cnpj VARCHAR(32) NULL UNIQUE, FOREIGN KEY(company_id) REFERENCES companies(id)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS platform_impersonations (
+ id CHAR(64) PRIMARY KEY,cookie_hash CHAR(64) NULL UNIQUE,admin_id INT UNSIGNED NOT NULL,
+ master_session_hash CHAR(64) NOT NULL,company_id INT UNSIGNED NOT NULL,owner_id INT UNSIGNED NOT NULL,
+ exchanged BOOLEAN NOT NULL DEFAULT FALSE,expires_at DATETIME NOT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ INDEX(expires_at),FOREIGN KEY(admin_id) REFERENCES platform_admins(id) ON DELETE CASCADE,
+ FOREIGN KEY(master_session_hash) REFERENCES platform_sessions(token_hash) ON DELETE CASCADE,
+ FOREIGN KEY(company_id) REFERENCES companies(id) ON DELETE CASCADE,
+ FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

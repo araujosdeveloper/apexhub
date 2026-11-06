@@ -19,11 +19,7 @@ function boardFilter(query, companyId) {
   }
   return { where: conditions.join(' AND '), params, offset: Number(offset), limit: Number(limit), scope };
 }
-function utcDate(value) {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)) return value.replace(' ', 'T') + 'Z';
-  return value;
-}
+const {utcDate}=require('./utc-date');
 function installOrderBoard(app, db, auth, events) {
   app.get('/api/admin/orders/events', auth, events.stream(db));
   app.get('/api/admin/orders/board', auth, asyncRoute(async (req, res) => {

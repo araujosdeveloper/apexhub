@@ -189,8 +189,12 @@ public_get /master-login.html >/dev/null
 public_get /master.css >/dev/null
 public_get /master.js >/dev/null
 public_get /master-login.js >/dev/null
+public_get /tenant/dashboard >/dev/null
+public_get /assisted-context.js >/dev/null
+public_get /impersonation-entry.js >/dev/null
+public_get /apex-tokens.css >/dev/null
 printf 'PUBLICADO\n' > "$update_dir/STATUS.txt"
 printf '%s\n' "$update_dir" > deploy/latest-update.path
 completed=true
-printf '\nATUALIZAÇÃO PUBLICADA: API Super Admin, empresas e métricas globais ApexHub.\n'
+printf '\nATUALIZAÇÃO PUBLICADA: acesso assistido e layout unificado Master/lojista ApexHub.\n'
 printf 'Painel: https://179.198.120.188/login.html\nMaster: https://179.198.120.188/master-login.html\nBackup final: %s\nRelatório: %s\n' "$final_backup" "$update_dir"

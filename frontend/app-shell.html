@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8"><link rel="stylesheet" href="/apex-tokens.css"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark"><title>ApexHub — Painel</title>
-  <link rel="stylesheet" href="/dashboard.css"><link rel="stylesheet" href="/app-shell.css"><script src="/app-shell.js" defer></script>
+  <link rel="stylesheet" href="/dashboard.css"><link rel="stylesheet" href="/app-shell.css"><script src="/assisted-context.js"></script><script src="/app-shell.js" defer></script>
 </head>
 <body class="apex-shell">
 <a class="skip-link" href="#main">Pular para o conteúdo</a>
@@ -24,6 +24,7 @@
     <div class="popover-wrap"><button class="icon-button notification-button" id="notifications-toggle" aria-label="Notificações de pedidos" aria-controls="notifications" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span id="notification-dot" class="notification-dot" hidden></span></button><div class="popover notifications" id="notifications" hidden><strong>Central da operação</strong><p id="notification-text">Carregando pedidos…</p><a href="/admin.html">Abrir gestor de pedidos <svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></a></div></div>
     <span class="topbar-divider"></span><div class="popover-wrap"><button class="profile-button" id="profile-toggle" aria-expanded="false" aria-controls="profile-menu"><span class="avatar" id="avatar">AH</span><span class="profile-copy"><strong id="user-name">Sua conta</strong><small id="user-role">ApexHub</small></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button><div class="popover profile-menu" id="profile-menu" hidden><p id="user-email"></p><a id="shell-store-link" href="/" target="_blank" rel="noopener noreferrer">Abrir cardápio da loja</a><a href="/operations.html">Configurações da loja</a><a id="team-link" href="/team.html" hidden>Gerenciar equipe</a><button id="logout"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg>Sair da conta</button></div></div></div>
   </header>
+  <section id="assisted-banner" class="assisted-banner" aria-label="Acesso assistido" hidden><div><strong>Acesso assistido · Master</strong><span id="assisted-description"></span></div><button type="button" id="assisted-exit">Encerrar e voltar ao Master ↗</button></section>
   <main id="main" class="view-port" tabindex="-1" aria-label="Conteúdo da página">
     <div id="shell-feedback" class="shell-feedback" role="status" aria-live="polite" hidden></div>
     <div id="view-loading" class="view-loading" role="status">Carregando o painel…</div>

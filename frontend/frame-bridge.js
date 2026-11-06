@@ -5,7 +5,7 @@
   const page=location.pathname.split('/').pop().replace('.html','');
   document.documentElement.classList.add('apex-view-root');
   document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('apex-view','apex-view-'+page));
-  if(window.parent===window)return;
+  if(window.parent===window){try{const url=new URL(location.href);if(url.searchParams.get('view')==='1'){url.searchParams.delete('view');url.searchParams.delete('_shell');location.replace(url.pathname+url.search+url.hash);}}catch{}return;}
   const send=data=>window.parent.postMessage(data,location.origin);
   document.addEventListener('click',event=>{
     const link=event.target.closest('a[href]');
