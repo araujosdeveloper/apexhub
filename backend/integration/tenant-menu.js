@@ -22,7 +22,7 @@ async function verifyTenantMenu(db,request,{a,b}){
   for(const value of [false,false,true]){const response=await call('/products/'+productId+'/availability','PUT',{is_available:value});assert.equal(response.status,200);assert.equal((await get()).is_available,value);}
   const publicMenu=await request('/api/menu/'+a.slug);assert.equal(publicMenu.status,200);assert.equal((await publicMenu.json()).products.find(p=>p.id===productId).image_url,input.image_url);
   const [customer]=await db.execute("INSERT INTO customers(company_id,name,phone,address_street,address_number,address_neighborhood) VALUES (?,'Menu teste',?,'Rua','1','Centro')",[a.id,'menu-'+randomUUID()]);customerId=customer.insertId;
-  const [order]=await db.execute("INSERT INTO orders(company_id,customer_id,total_amount,status,payment_method) VALUES (?,?,'19.90','completed','Pix')",[a.id,customerId]);orderId=order.insertId;
+  const [order]=await db.execute("INSERT INTO orders(company_id,customer_id,total_amount,status,payment_method,customer_name,customer_phone,address_street,address_number,address_neighborhood) VALUES (?,?,'19.90','completed','Pix','Menu teste','11922220000','Rua','1','Centro')",[a.id,customerId]);orderId=order.insertId;
   await db.execute("INSERT INTO order_items(order_id,product_id,product_name,quantity,unit_price,total_price) VALUES (?,?,'Combo histórico',1,'19.90','19.90')",[orderId,productId]);
   for(let i=0;i<2;i++)assert.equal((await call('/products/'+productId,'DELETE',{})).status,200);
   const [[historical]]=await db.execute('SELECT product_name FROM order_items WHERE order_id=?',[orderId]);assert.equal(historical.product_name,'Combo histórico');
