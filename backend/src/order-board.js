@@ -39,7 +39,7 @@ function installOrderBoard(app, db, auth, events) {
       FROM orders o LEFT JOIN delivery_assignments a ON a.order_id = o.id AND a.company_id = o.company_id LEFT JOIN order_tracking t ON t.order_id=o.id WHERE ${filter.where} ORDER BY o.created_at ${direction}, o.id ${direction} LIMIT ${filter.limit} OFFSET ${filter.offset}`, filter.params);
     let items = [];
     if (orders.length) {
-      [items] = await db.execute(`SELECT oi.id, oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot
+      [items] = await db.execute(`SELECT oi.id, oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot, oi.item_notes
         FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')}) ORDER BY oi.id`, [req.tenantId, ...orders.map(order => order.id)]);
     }
     res.json({ company_id: req.tenantId, orders: orders.map(order => { const {tracking_token,...data}=order;return { ...data, tracking_url:typeof tracking_token==='string'&&/^[a-f0-9]{64}$/.test(tracking_token)?'/track.html#'+tracking_token:null, created_at: utcDate(order.created_at), items: items.filter(item => item.order_id === order.id) }; }),

@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED NOT NULL, product_id INT UNSIGNED NOT NULL,
  product_name VARCHAR(160) NOT NULL, quantity INT UNSIGNED NOT NULL, addons_snapshot JSON NULL,
+ item_notes VARCHAR(500) NOT NULL DEFAULT '',
  unit_price DECIMAL(10,2) NOT NULL, total_price DECIMAL(10,2) NOT NULL,
  CHECK (quantity > 0), CHECK (unit_price >= 0), CHECK (total_price >= 0),
  FOREIGN KEY (order_id) REFERENCES orders(id), FOREIGN KEY (product_id) REFERENCES products(id)

@@ -180,3 +180,24 @@ test('cardápio mobile: prazo real de entrega/retirada e categorias com navegaç
 test('cardápio mobile: link de categoria respeita preferência por movimento reduzido',async()=>{
  const page=await storefront();let scroll;page.nodes.set('menu-category-1',{scrollIntoView:options=>{scroll=options;}});page.context.matchMedia=()=>({matches:true});page.run("jumpMenuCategory('menu-category-1')");assert.equal(scroll.behavior,'auto');assert.equal(scroll.block,'start');
 });
+
+test('observações permanecem separadas na sacola, na recarga e no envio', async () => {
+ const page = await storefront();
+ page.run("addToCart(1); updateItemNotes(0, 'Sem milho'); addToCart(1); updateItemNotes(1, 'Com milho'); openCheckout()");
+ assert.equal(page.run('cart.length'), 2);
+ assert.match(page.nodes.get('cart-items-list').innerHTML, /Sem milho/);
+ const restored = await storefront({ storage: page.storage });
+ assert.equal(restored.run('cart.length'), 2);
+ assert.equal(restored.run('cart[0].notes'), 'Sem milho');
+ await restored.run('sendOrder()');
+ const items = JSON.parse(restored.requests[0].body).items;
+ assert.deepEqual(items.map(item => item.notes), ['Sem milho', 'Com milho']);
+});
+test('observação é escapada na sacola e não aceita conteúdo inválido', async () => {
+ const page = await storefront();
+ page.run("addToCart(1); updateItemNotes(0, '</textarea><img src=x>'); openCheckout()");
+ assert.doesNotMatch(page.nodes.get('cart-items-list').innerHTML, /<img src=x>/);
+ assert.match(page.nodes.get('cart-items-list').innerHTML, /&lt;img/);
+ page.run("updateItemNotes(0, 'x'.repeat(501))");
+ assert.equal(page.run('cart[0].notes'), '</textarea><img src=x>');
+});

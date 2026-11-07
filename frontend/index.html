@@ -103,7 +103,7 @@
     <div id="addons-modal" role="dialog" aria-modal="true" aria-labelledby="addons-title" class="fixed inset-0 bg-black bg-opacity-50 hidden flex justify-center items-center p-4">
         <div class="surface-card w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3"><h2 id="addons-title" class="text-xl font-bold"></h2><button type="button" onclick="closeAddons()" aria-label="Fechar adicionais" class="text-xl px-3">×</button></div>
-            <div id="addons-options"></div><p id="addons-error" role="status" aria-live="polite" class="text-danger my-3"></p>
+            <div id="addons-options"></div><label for="item-notes" class="block font-bold mt-3">Observação deste item</label><textarea id="item-notes" maxlength="500" rows="2" class="w-full border rounded p-2" placeholder="Ex.: sem milho, molho separado"></textarea><p class="text-sm text-secondary">A observação vale para todas as unidades desta linha. Para preparos diferentes, adicione o produto novamente.</p><p id="addons-error" role="status" aria-live="polite" class="text-danger my-3"></p>
             <button id="confirm-addons" type="button" onclick="confirmAddons()" class="w-full action-primary text-primary py-3 rounded-xl font-bold">Adicionar ao carrinho</button>
         </div>
     </div>
@@ -150,7 +150,7 @@
                     if (!product || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) { removedItems = true; return []; }
                     try {
                         if (item.addon_version && item.addon_version !== product.addon_version) throw new Error('Adicionais alterados');
-                        const restored = customizedItem(product, item.option_ids || []);
+                        const restored = customizedItem(product, item.option_ids || [], item.notes || '');
                         return [{ ...restored, quantity: item.quantity }];
                     } catch { removedItems = true; return []; }
                 });
@@ -263,7 +263,7 @@
         function couponContext() {
             const selection = checkoutSelection();
             return JSON.stringify({ companyId, code: document.getElementById('coupon-code').value.trim().toUpperCase(), phone: document.getElementById('customer-phone').value.trim(), method: selection.method, neighborhood: selection.neighborhood, fee: selection.fee,
-                items: cart.map(item => [item.id, item.quantity, item.option_ids || [], item.addon_version || 0, item.price]) });
+                items: cart.map(item => [item.id, item.quantity, item.option_ids || [], item.addon_version || 0, item.price, item.notes || '']) });
         }
         function updateCheckoutTotal() {
             const selection = checkoutSelection(), signature = couponContext();
@@ -295,7 +295,7 @@
             const request = ++couponRequest, signature = couponContext(); applyingCoupon = true; updateCheckoutTotal();
             document.getElementById('coupon-message').textContent = 'Conferindo cupom…';
             try {
-                const response = await fetch('/api/coupons/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId, coupon_code: code, phone, fulfillment_method: selection.method, neighborhood: selection.neighborhood, items: cart.map(({ id, quantity, option_ids, addon_version }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}) })) }) });
+                const response = await fetch('/api/coupons/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId, coupon_code: code, phone, fulfillment_method: selection.method, neighborhood: selection.neighborhood, items: cart.map(({ id, quantity, option_ids, addon_version, notes }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}) })) }) });
                 const result = await response.json();
                 if (request !== couponRequest) return;
                 if (signature !== couponContext()) throw new Error('O pedido mudou. Aplique o cupom novamente.');
@@ -309,7 +309,9 @@
         }
         document.getElementById('customer-phone').oninput = updateCheckoutTotal;
         let customization = null;
-        function customizedItem(product, ids = []) {
+        function customizedItem(product, ids = [], notes = '') {
+            if (typeof notes !== 'string' || notes.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(notes)) throw new Error('Use uma observação de até 500 caracteres.');
+            notes = notes.trim();
             const groups = product.addon_groups || [], selected = new Set(ids), options = [];
             if (!Array.isArray(ids) || selected.size !== ids.length) throw new Error('Seleção inválida.');
             for (const group of groups) {
@@ -319,12 +321,12 @@
             }
             if (selected.size) throw new Error('Adicional indisponível.');
             const cents = Math.round(Number(product.price) * 100) + options.reduce((sum, option) => sum + Math.round(Number(option.price) * 100), 0);
-            return { ...product, price: (cents / 100).toFixed(2), option_ids: [...ids].sort(), selected_options: options, addon_version: groups.length ? product.addon_version : 0 };
+            return { ...product, ...(notes ? { notes } : {}), price: (cents / 100).toFixed(2), option_ids: [...ids].sort(), selected_options: options, addon_version: groups.length ? product.addon_version : 0 };
         }
-        function addCustomizedItem(product, ids) {
+        function addCustomizedItem(product, ids, notes = '') {
             if (cart.filter(item => item.id === product.id).reduce((sum, item) => sum + item.quantity, 0) >= 99) throw new Error('Limite de 99 unidades por produto.');
-            const item = customizedItem(product, ids);
-            const existing = cart.find(other => other.id === product.id && JSON.stringify(other.option_ids || []) === JSON.stringify(item.option_ids));
+            const item = customizedItem(product, ids, notes);
+            const existing = cart.find(other => other.id === product.id && JSON.stringify(other.option_ids || []) === JSON.stringify(item.option_ids) && (other.notes || '') === (item.notes || ''));
             if (existing) existing.quantity++; else cart.push({ ...item, quantity: 1 });
             updateCartUI();
         }
@@ -334,8 +336,9 @@
             if (!product) return;
             if ((product.addon_groups || []).length) {
                 customization = { product, ids: new Set() };
+                document.getElementById('item-notes').value = '';
                 document.getElementById('addons-title').textContent = product.name;
-                document.getElementById('addons-options').innerHTML = product.addon_groups.map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-secondary">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max}</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span><input type="checkbox" onchange="toggleAddon('${option.id}')"> ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
+                document.getElementById('addons-options').innerHTML = (product.addon_groups || []).map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-secondary">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max}</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span><input type="checkbox" onchange="toggleAddon('${option.id}')"> ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
                 document.getElementById('addons-error').textContent = '';
                 document.getElementById('confirm-addons').textContent = `Adicionar · a partir de R$ ${Number(product.price).toFixed(2)}`;
                 document.getElementById('addons-modal').classList.remove('hidden');
@@ -355,8 +358,16 @@
         document.addEventListener?.('keydown', event => { if (event.key === 'Escape' && customization) closeAddons(); });
         function confirmAddons() {
             if (!customization || sendingOrder) return;
-            try { addCustomizedItem(customization.product, [...customization.ids]); closeAddons(); }
+            try { addCustomizedItem(customization.product, [...customization.ids], document.getElementById('item-notes').value); closeAddons(); }
             catch (error) { document.getElementById('addons-error').textContent = error.message; }
+        }
+        function updateItemNotes(index, value) {
+            if (sendingOrder || !cart[index]) return;
+            try {
+                const item = customizedItem(storeData.products.find(product => product.id === cart[index].id), cart[index].option_ids || [], value);
+                cart[index] = { ...item, quantity: cart[index].quantity };
+                updateCartUI();
+            } catch (error) { document.getElementById('cart-notice').textContent = error.message; }
         }
         function changeQuantity(productId, delta) { changeQuantityByIndex(cart.findIndex(item => item.id === productId), delta); }
         function changeQuantityByIndex(index, delta) {
@@ -370,7 +381,7 @@
         }
 
         function updateCartUI() {
-            storageSet(cartStorageKey, cart.map(({ id, quantity, option_ids, addon_version }) => ({ id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}) })));
+            storageSet(cartStorageKey, cart.map(({ id, quantity, option_ids, addon_version, notes }) => ({ id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}) })));
             renderSuggestions();
             if (checkoutOpen && cart.length) openCheckout();
             const cartBar = document.getElementById('cart-bar');
@@ -400,6 +411,7 @@
                     <div class="flex justify-between items-center py-2">
                         <div>
                             <p class="font-bold text-sm">${escapeHtml(item.name)}</p><p class="text-xs text-secondary">${(item.selected_options || []).map(option => escapeHtml(option.name) + (Number(option.price) ? " (+ R$ " + Number(option.price).toFixed(2) + ")" : "")).join(", ")}</p>
+                            <label class="block text-sm" for="cart-note-${index}">Observação deste item</label><textarea id="cart-note-${index}" maxlength="500" rows="2" class="w-full border rounded p-2" onchange="updateItemNotes(${index}, this.value)">${escapeHtml(item.notes || '')}</textarea><p class="text-xs text-secondary">Vale para todas as unidades desta linha. Adicione novamente para um preparo diferente.</p>
                             <p class="text-xs text-secondary">Qtd: ${item.quantity} x R$ ${Number(item.price).toFixed(2)}</p>
                             <div class="flex items-center gap-3 mt-2">
                                 <button type="button" onclick="changeQuantityByIndex(${index}, -1)" aria-label="Diminuir quantidade de ${escapeHtml(item.name)}" class="border rounded px-3 py-1">−</button>
@@ -445,7 +457,7 @@
             const orderPayload = {
                 company_id: companyId,
                 customer: { name, phone, street, number, neighborhood },
-                items: cart.map(({ id, quantity, option_ids, addon_version }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}) })),
+                items: cart.map(({ id, quantity, option_ids, addon_version, notes }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}) })),
                 payment_method: payment
             };
             // Conserva o conteúdo dos reenvios de delivery gratuitos anteriores a esta atualização.

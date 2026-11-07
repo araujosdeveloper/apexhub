@@ -88,3 +88,26 @@ test('operador, produto de outra loja e edição desatualizada não alteram adic
   if (role !== 'operator') { assert.equal(state.rollback, true); assert.equal(state.released, true); }
  }
 });
+
+test('observações separam preparos e conservam o contrato de itens antigos', () => {
+ const { lines, quantities } = normalizeLines([
+  { product_id: 1, quantity: 1, notes: ' Sem milho ' },
+  { product_id: 1, quantity: 1, notes: 'Com milho' },
+  { product_id: 1, quantity: 2, notes: 'Sem milho' }
+ ]);
+ assert.equal(lines.length, 2);
+ assert.equal(quantities.get(1), 4);
+ assert.equal(lines.find(line => line.notes === 'Sem milho').quantity, 3);
+ assert.deepEqual(normalizeLines([{ product_id: 1, quantity: 1 }]).lines,
+  [{ product_id: 1, option_ids: [], addon_version: 0, quantity: 1 }]);
+ for (const notes of [null, 12, {}, 'x'.repeat(501), 'sem\u0000milho']) {
+  assert.throws(() => normalizeLines([{ product_id: 1, quantity: 1, notes }]), /Observação/);
+ }
+});
+test('hash preserva reenvio antigo e detecta alteração da observação', () => {
+ const customer = { name: 'Ana', phone: '11999999999', street: 'Rua', number: '1', neighborhood: 'Centro' };
+ const hash = items => { const normalized = normalizeLines(items); return checkoutHash(1, customer, 'Pix', normalized.quantities, 'delivery', undefined, normalized.lines); };
+ assert.equal(hash([{ product_id: 1, quantity: 1 }]), hash([{ product_id: 1, quantity: 1, notes: ' ' }]));
+ assert.notEqual(hash([{ product_id: 1, quantity: 1, notes: 'Sem milho' }]), hash([{ product_id: 1, quantity: 1, notes: 'Com milho' }]));
+ assert.notEqual(hash([{ product_id: 1, quantity: 1, notes: 'Sem milho' }, { product_id: 1, quantity: 1 }]), hash([{ product_id: 1, quantity: 2, notes: 'Sem milho' }]));
+});

@@ -47,3 +47,11 @@ Verificações locais concluídas: `npm run check` aprovado e `npm test` com 12 
 A integração MySQL foi ampliada para edições e checkouts concorrentes, snapshots e migrações com IDs INT/INT UNSIGNED, com/sem frete preexistente e preservação de seleções legadas. A execução real no host foi aprovada em 03/11/2026: `reports/mysql-validation-20261103T201735Z-1427325.log`. A candidata publicada também aprovou 94 testes em Node v22.23.4. Ensaio, migração 005 no banco real e verificação de 14 tabelas passaram, com registros originais preservados; evidência em `reports/update-20261103T201720Z-1426258/`. O responsável confirmou o funcionamento visual geral dos módulos publicados antes da entrega seguinte.
 
 Antes de publicar, executar `bash scripts/validate-mysql.sh` no host autorizado e ensaiar 004/005 numa cópia atual do banco publicado. Validar cadastro, compra, total, histórico e reenvio em navegador. As migrações usam DDL MySQL com commit implícito. Uma volta à versão anterior após receber pedidos personalizados exige revisão, pois ela não apresenta esses adicionais corretamente.
+
+## Observações por item — preparada para revisão
+
+O cardápio aceita observação opcional de até 500 caracteres por linha, no diálogo de adicionais ou na sacola. Para duas unidades com preparos diferentes, adicione o produto novamente e informe uma observação em cada linha. A quantidade de uma linha aplica a mesma instrução a todas as suas unidades. Texto é tratado como dado e escapado nas interfaces.
+
+O checkout recebe `items[].notes`, valida tipo, tamanho e caracteres de controle, preserva em `order_items.item_notes` e considera a observação na normalização e no hash de idempotência. Observação vazia mantém os hashes anteriores. A instrução aparece no gestor, cozinha, impressão manual e histórico do cliente. O link público de acompanhamento continua omitindo texto livre, conforme seu contrato de privacidade.
+
+A migração aditiva `016-item-instructions.sql` inclui a coluna com padrão vazio, integrada ao planejador de atualização. O esquema inicial já contém a coluna. A suíte local cobre diferenciação de preparos, persistência na sacola, escape de HTML e reenvio com conflito. Integração MySQL e ensaio de atualização foram ampliados, mas precisam ser executados no host antes da publicação pelo atualizador habitual. Esta alteração ainda não foi publicada.

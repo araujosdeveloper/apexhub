@@ -100,7 +100,7 @@ test('checkout calcula valores pelo banco e preserva produto e endereço', async
  assert.equal(response.status, 201);
  assert.equal((await response.json()).total_amount, 24.7);
  assert.equal(state.orderArgs[2], '24.70'); assert.deepEqual(state.orderArgs.slice(4), ['Ana', '11999999999', 'Rua A', '10', 'Centro', 'delivery', '0.00', '', 60, '0.00', '', null, '5511999999999']);
- assert.deepEqual(state.itemArgs, [22, 1, 'Produto', 2, '12.35', '24.70', '[]']);
+ assert.deepEqual(state.itemArgs, [22, 1, 'Produto', 2, '12.35', '24.70', '[]', '']);
  assert.equal(state.committed, true); assert.equal(state.released, true);
 });
 test('produto indisponível desfaz transação sem criar pedido', async t => {
@@ -341,4 +341,17 @@ test('prévia calcula desconto sem reservar uso ou criar pedido', async t => {
 test('checkout devolve o mesmo acompanhamento privado após reenvio idempotente',async t=>{
  const {db,state}=orderDb(),request=await serve(t,db);const options={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)};
  const first=await(await request('/api/orders',options)).json(),again=await(await request('/api/orders',options)).json();assert.match(first.tracking_url,/^\/track.html#[a-f0-9]{64}$/);assert.equal(first.tracking_url,again.tracking_url);assert.equal(state.orderWrites,1);assert.equal(again.replayed,true);
+});
+
+test('checkout grava observação por linha e recusa reutilizar chave com outro preparo', async t => {
+ const { db, state } = orderDb();
+ const request = await serve(t, db);
+ const body = { ...payload, items: [{ id: 1, quantity: 1, notes: 'Sem milho' }, { id: 1, quantity: 1, notes: 'Com milho' }] };
+ const options = data => ({ method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'item-notes-regression-123' }, body: JSON.stringify(data) });
+ assert.equal((await request('/api/orders', options(body))).status, 201);
+ assert.equal(state.itemWrites.length, 2);
+ assert.deepEqual(state.itemWrites.map(args => args[7]).sort(), ['Com milho', 'Sem milho']);
+ assert.equal((await request('/api/orders', options(body))).status, 200);
+ assert.equal(state.itemWrites.length, 2);
+ assert.equal((await request('/api/orders', options({ ...body, items: [{ id: 1, quantity: 2, notes: 'Sem milho' }] }))).status, 409);
 });

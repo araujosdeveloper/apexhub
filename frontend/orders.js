@@ -29,7 +29,7 @@ function addons(snapshot) {
 function itemsHtml(order, prices = !kitchen) {
   const items = order.items || [];
   if (!items.length) return '<p class="notice error">Pedido antigo sem itens registrados. Confirme com o responsável antes de produzir.</p>';
-  return '<ul class="items">' + items.map(item => `<li><span class="quantity">${Number(item.quantity)}×</span> ${escapeHtml(item.product_name)}${prices ? ' <span class="muted">· ' + money(item.total_price ?? item.unit_price * item.quantity) + '</span>' : ''}${addons(item.addons_snapshot).length ? '<ul class="addon-list">' + addons(item.addons_snapshot).map(option => `<li>+ ${escapeHtml(option.group_name)}: ${escapeHtml(option.name)}${prices && Number(option.price) ? ' · ' + money(option.price) + ' por unidade' : ''}</li>`).join('') + '</ul>' : ''}</li>`).join('') + '</ul>';
+  return '<ul class="items">' + items.map(item => `<li><span class="quantity">${Number(item.quantity)}×</span> ${escapeHtml(item.product_name)}${prices ? ' <span class="muted">· ' + money(item.total_price ?? item.unit_price * item.quantity) + '</span>' : ''}${addons(item.addons_snapshot).length ? '<ul class="addon-list">' + addons(item.addons_snapshot).map(option => `<li>+ ${escapeHtml(option.group_name)}: ${escapeHtml(option.name)}${prices && Number(option.price) ? ' · ' + money(option.price) + ' por unidade' : ''}</li>`).join('') + '</ul>' : ''}${item.item_notes ? '<p class="notes">Observação: ' + escapeHtml(item.item_notes) + '</p>' : ''}</li>`).join('') + '</ul>';
 }
 function timing(order, now = Date.now() + state.clockOffset) {
   const received = Date.parse(order.created_at);

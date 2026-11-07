@@ -131,7 +131,7 @@ function createApp(db, options = {}) {
       fulfillment_method, delivery_fee, fulfillment_address, estimated_minutes, coupon_code, discount_amount, coupon_snapshot
       FROM orders WHERE company_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`, [req.tenantId]);
     if (!orders.length) return res.json([]);
-    const [items] = await db.execute(`SELECT oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot
+    const [items] = await db.execute(`SELECT oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot, oi.item_notes
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')})`, [req.tenantId, ...orders.map(o => o.id)]);
     res.json(orders.map(order => ({ ...order, items: items.filter(i => i.order_id === order.id) })));
@@ -217,8 +217,8 @@ function createApp(db, options = {}) {
         fulfillment_method === 'pickup' ? operations.pickup_minutes : operations.delivery_minutes,
         (discountCents / 100).toFixed(2), code, coupon ? JSON.stringify(coupon.snapshot) : null, phoneKey(customer.phone)]);
       for (const line of pricedLines) {
-        await conn.execute('INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, addons_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [order.insertId, line.product_id, line.name, line.quantity, (line.unitCents / 100).toFixed(2), (line.unitCents * line.quantity / 100).toFixed(2), JSON.stringify(line.snapshot)]);
+        await conn.execute('INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, addons_snapshot, item_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [order.insertId, line.product_id, line.name, line.quantity, (line.unitCents / 100).toFixed(2), (line.unitCents * line.quantity / 100).toFixed(2), JSON.stringify(line.snapshot), line.notes || '']);
       }
       if (coupon) await conn.execute('UPDATE company_coupons SET usage_count = usage_count + 1 WHERE id = ? AND company_id = ?', [coupon.id, company_id]);
       const tracking_url=await ensureTracking(conn,order.insertId);

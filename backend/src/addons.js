@@ -26,14 +26,16 @@ function normalizeLines(items) {
     const option_ids = item.option_ids ?? [];
     if (!Array.isArray(option_ids) || option_ids.length > 240 || option_ids.some(id => !validId(id)) || new Set(option_ids).size !== option_ids.length ||
       (item.addon_version !== undefined && (!Number.isSafeInteger(item.addon_version) || item.addon_version < 0))) throw new Error('Seleção de adicionais inválida.');
+    if (item.notes !== undefined && (typeof item.notes !== 'string' || item.notes.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(item.notes))) throw new Error('Observação do item inválida. Use até 500 caracteres.');
+    const notes = (item.notes || '').trim();
     const sorted = [...option_ids].sort(), addon_version = item.addon_version || 0;
-    const key = JSON.stringify([product_id, sorted, addon_version]);
-    const line = lines.get(key) || { product_id, option_ids: sorted, addon_version, quantity: 0 };
+    const key = JSON.stringify([product_id, sorted, addon_version, notes]);
+    const line = lines.get(key) || { product_id, option_ids: sorted, addon_version, quantity: 0, ...(notes ? { notes } : {}) };
     line.quantity += item.quantity; lines.set(key, line);
     quantities.set(product_id, (quantities.get(product_id) || 0) + item.quantity);
     if (quantities.get(product_id) > 99) throw new Error('Limite de 99 unidades por produto, incluindo variações.');
   }
-  const key = line => JSON.stringify([line.product_id, line.option_ids, line.addon_version]);
+  const key = line => JSON.stringify([line.product_id, line.option_ids, line.addon_version, line.notes || '']);
   return { lines: [...lines.values()].sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0), quantities };
 }
 function priceLine(product, line) {
