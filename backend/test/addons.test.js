@@ -22,6 +22,16 @@ test('variações diferentes permanecem separadas; seleções equivalentes são 
  assert.equal(normalized.lines.find(line => line.option_ids.includes('cheese')).quantity, 3);
  assert.throws(() => normalizeLines([item(['mayo'], 50), item(['ketchup'], 50)]), /99 unidades/);
 });
+test('observações individuais são normalizadas e mantêm linhas separadas no pedido', () => {
+ const normalized = normalizeLines([
+  { ...item(['cheese']), notes: '  Sem cebola  ' },
+  { ...item(['cheese']), notes: 'Com bastante molho' },
+  { ...item(['cheese']), notes: 'Sem cebola' }
+ ]);
+ assert.equal(normalized.lines.length, 2);
+ assert.deepEqual(normalized.lines.map(line => [line.notes, line.quantity]), [['Com bastante molho', 1], ['Sem cebola', 2]]);
+ assert.throws(() => normalizeLines([{ ...item([]), notes: 'x'.repeat(501) }]), /500 caracteres/);
+});
 test('opções duplicadas, identificadores inválidos e versões inválidas são rejeitados', () => {
  for (const change of [{ option_ids: ['ketchup', 'ketchup'] }, { option_ids: ['<script>'] }, { option_ids: 'ketchup' }, { addon_version: -1 }, { addon_version: '2' }]) {
   assert.throws(() => normalizeLines([{ ...item(['ketchup']), ...change }]), /inválida/);
@@ -54,6 +64,7 @@ test('hash identifica variações e versões; pedidos antigos sem adicionais man
  assert.equal(hash([item(['cheese', 'ketchup']), item(['mayo'])]), hash([item(['mayo']), item(['ketchup', 'cheese'])]));
  assert.notEqual(hash([item(['ketchup'])]), hash([item(['mayo'])]));
  assert.notEqual(hash([item(['ketchup'])]), hash([{ ...item(['ketchup']), addon_version: 3 }]));
+ assert.notEqual(hash([{ ...item([]), notes: 'Sem cebola' }]), hash([{ ...item([]), notes: 'Com cebola' }]));
  assert.equal(hash([{ product_id: 1, quantity: 2 }]), checkoutHash(7, customer, 'Pix', new Map([[1, 2]])));
 });
 function dbFor(role = 'owner', found = true, revision = 0) {

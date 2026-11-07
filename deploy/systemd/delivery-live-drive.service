@@ -1,5 +1,5 @@
 [Unit]
-Description=Envio criptografado dos backups Delivery SaaS ao Google Drive
+Description=Envio criptografado dos backups Apex Delivery ao Google Drive
 Requires=docker.service
 After=docker.service
 

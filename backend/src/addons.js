@@ -33,12 +33,12 @@ function normalizeLines(items) {
     const option_ids = item.option_ids ?? entries.map(([id]) => id);
     if (!Array.isArray(option_ids) || option_ids.length > 240 || option_ids.some(id => !validId(id)) || new Set(option_ids).size !== option_ids.length ||
       (item.addon_version !== undefined && (!Number.isSafeInteger(item.addon_version) || item.addon_version < 0))) throw new Error('Seleção de adicionais inválida.');
+    const sorted = [...option_ids].sort(), addon_version = item.addon_version || 0;
     if (entries.some(([id]) => !option_ids.includes(id))) throw new Error('Quantidade informada para adicional não selecionado.');
     const counts = Object.fromEntries([...option_ids].sort().map(id => [id, Object.hasOwn(supplied || {}, id) ? supplied[id] : 1]));
     const repeated = Object.values(counts).some(count => count > 1);
     if (item.notes !== undefined && (typeof item.notes !== 'string' || item.notes.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(item.notes))) throw new Error('Observação do item inválida. Use até 500 caracteres.');
     const notes = (item.notes || '').trim();
-    const sorted = [...option_ids].sort(), addon_version = item.addon_version || 0;
     const key = JSON.stringify([product_id, sorted, addon_version, notes, repeated ? counts : null]);
     const line = lines.get(key) || { product_id, option_ids: sorted, addon_version, quantity: 0, ...(notes ? { notes } : {}), ...(repeated ? { option_quantities: counts } : {}) };
     line.quantity += item.quantity; lines.set(key, line);

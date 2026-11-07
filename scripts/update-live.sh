@@ -193,8 +193,11 @@ public_get /tenant/dashboard >/dev/null
 public_get /assisted-context.js >/dev/null
 public_get /impersonation-entry.js >/dev/null
 public_get /apex-tokens.css >/dev/null
+public_get /landing.html >/dev/null
+public_get /landing.css >/dev/null
+public_get /favicon.svg >/dev/null
 printf 'PUBLICADO\n' > "$update_dir/STATUS.txt"
 printf '%s\n' "$update_dir" > deploy/latest-update.path
 completed=true
-printf '\nATUALIZAÇÃO PUBLICADA: enquadramento da capa e sobreposição da logo ApexHub.\n'
+printf '\nATUALIZAÇÃO PUBLICADA: landing comercial e roteamento de hosts Apex Delivery.\n'
 printf 'Painel: https://179.198.120.188/login.html\nMaster: https://179.198.120.188/master-login.html\nBackup final: %s\nRelatório: %s\n' "$final_backup" "$update_dir"

@@ -72,6 +72,7 @@ function orderDb({ products = [{ id: 1, name: 'Produto', price: '12.35' }], fail
    if(sql.startsWith('SELECT token FROM order_tracking'))return [state.trackingToken?[{token:state.trackingToken}]:[]];
    if(sql.startsWith('INSERT INTO order_tracking')){state.trackingToken=args[1];return [{affectedRows:1}];}
    if (sql.startsWith('SELECT id FROM companies')) return [[{ id: 7 }]];
+   if (sql.includes('FROM subscriptions WHERE company_id = ?')) return [[{plan_code:'trial',status:'trialing',trial_ends_at:'2026-12-07 00:00:00',trial_valid:1}]];
    if (sql.startsWith('SELECT config FROM company_operations')) return [operations ? [{ config: operations }] : []];
    if (sql.startsWith('INSERT INTO checkout_requests')) {
     if (state.orderWrites && !state.rolledBack) throw Object.assign(new Error(), { code: 'ER_DUP_ENTRY' });
@@ -102,6 +103,14 @@ test('checkout calcula valores pelo banco e preserva produto e endereço', async
  assert.equal(state.orderArgs[2], '24.70'); assert.deepEqual(state.orderArgs.slice(4), ['Ana', '11999999999', 'Rua A', '10', 'Centro', 'delivery', '0.00', '', 60, '0.00', '', null, '5511999999999']);
  assert.deepEqual(state.itemArgs, [22, 1, 'Produto', 2, '12.35', '24.70', '[]', '']);
  assert.equal(state.committed, true); assert.equal(state.released, true);
+});
+test('checkout aceita tenant_id como identificador da loja e rejeita conflito com company_id', async t => {
+ const valid = orderDb(); const validRequest = await serve(t, valid.db);
+ const response = await validRequest('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, tenant_id: 7, company_id: undefined }) });
+ assert.equal(response.status, 201); assert.equal(valid.state.orderArgs[0], 7);
+ const conflicting = orderDb(); const conflictRequest = await serve(t, conflicting.db);
+ const conflict = await conflictRequest('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, tenant_id: 8 }) });
+ assert.equal(conflict.status, 400); assert.equal(conflicting.state.orderWrites, 0);
 });
 test('produto indisponível desfaz transação sem criar pedido', async t => {
  const { db, state } = orderDb({ products: [] }); const request = await serve(t, db);
@@ -337,6 +346,12 @@ test('prévia calcula desconto sem reservar uso ou criar pedido', async t => {
  const { db, state } = orderDb({ couponRow: { id:3, code:'TESTE', config, version:1, usage_count:0 } }); const request = await serve(t, db);
  const response = await request('/api/coupons/quote', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ company_id:7, coupon_code:'teste', phone:payload.customer.phone, items:payload.items, fulfillment_method:'delivery', neighborhood:'Centro' }) });
  assert.equal(response.status, 200); const quote = await response.json(); assert.equal(quote.total_amount, '19.70'); assert.equal(quote.subtotal_amount, '24.70'); assert.equal(state.couponWrites, 0); assert.equal(state.orderWrites, 0);
+});
+test('validação pública aceita tenant_id, retorna envelope e recalcula valores no servidor', async t => {
+ const config = { active:true, first_purchase:false, kind:'percent', value:'10.00', min_subtotal:'0.00', max_discount:null, total_limit:null, per_customer_limit:null, starts_at:null, ends_at:null };
+ const { db, state } = orderDb({ couponRow: { id:3, code:'TESTE', config, version:1, usage_count:0 } }); const request = await serve(t, db);
+ const response = await request('/api/public/coupons/validate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tenant_id:7, code:'teste', phone:payload.customer.phone, items:payload.items, fulfillment_method:'delivery', neighborhood:'Centro' }) });
+ assert.equal(response.status, 200); const body = await response.json(); assert.equal(body.success, true); assert.equal(body.data.coupon_code, 'TESTE'); assert.equal(body.data.discount_amount, '2.47'); assert.equal(body.data.total_amount, '22.23'); assert.equal(state.couponWrites, 0);
 });
 test('checkout devolve o mesmo acompanhamento privado após reenvio idempotente',async t=>{
  const {db,state}=orderDb(),request=await serve(t,db);const options={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)};

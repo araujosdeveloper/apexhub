@@ -7,7 +7,7 @@ const {provisionMaster}=require('../backend/src/provision-master');
 const EMAIL='araujosdeveloper@gmail.com';
 function buildProgram(password=randomBytes(24).toString('base64url')){
  if(!/^[A-Za-z0-9_-]{32}$/.test(password))throw new Error('Senha automática inválida.');
- const input={name:'Administrador ApexHub',email:EMAIL,password};
+ const input={name:'Administrador Apex Delivery',email:EMAIL,password};
  return `const mysql=require('mysql2/promise');
 const {hashPassword,verifyPassword}=require('./src/security');
 ${recoverMaster.toString()}

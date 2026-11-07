@@ -7,7 +7,7 @@ function checkoutHash(companyId, customer, payment, quantities, method = 'delive
   if (fee !== undefined) value.delivery_fee = fee;
   if (lines.some(line => line.option_ids.length || line.addon_version)) value.variants = lines.map(line => [line.product_id, line.quantity, line.option_ids, line.addon_version]);
   if (lines.some(line => line.notes)) value.instructions = lines.map(line => [line.product_id, line.quantity, line.option_ids, line.addon_version, line.notes || '']);
-  if (lines.some(line => line.option_quantities)) value.addon_quantities = lines.map(line => line.option_ids.map(id => [id, line.option_quantities?.[id] || 1]));
+  if (lines.some(line => line.option_quantities && Object.values(line.option_quantities).some(quantity => quantity > 1))) value.addon_quantities = lines.map(line => line.option_ids.map(id => [id, line.option_quantities?.[id] || 1]));
   if (couponCode) value.coupon = [couponCode, couponDiscount, couponSubtotal];
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }

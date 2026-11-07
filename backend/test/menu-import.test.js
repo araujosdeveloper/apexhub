@@ -8,7 +8,7 @@ const jwt=testJwt(),token=role=>issue(jwt,{scope:'tenant',id:1,tenantId:7,role,s
 const menu={categories:[{name:'Lanches',products:[{name:'Combo',description:'Completo',price:'19.90'},{name:'Suco',description:'',price:'5.00'}]}]};
 function fake({role='owner',fail=false}={}){
  const calls=[];let id=10,writes=0;
- const execute=async(sql,args)=>{calls.push({sql,args});if(sql.includes('FROM sessions s'))return [[{id:1,company_id:7,role}]];if(sql.startsWith('SELECT id FROM companies'))return [[{id:7}]];if(sql.startsWith('INSERT')){if(fail&&++writes===3)throw Object.assign(Error('secret SQL'),{code:'ECONNRESET'});return [{insertId:id++}];}throw Error(sql);};
+ const execute=async(sql,args)=>{calls.push({sql,args});if(sql.includes('FROM sessions s'))return [[{id:1,company_id:7,role}]];if(sql.includes('FROM subscriptions WHERE company_id = ?'))return [[{plan_code:'trial',status:'trialing',trial_ends_at:'2026-12-07 00:00:00',trial_valid:1}]];if(sql.startsWith('SELECT id FROM companies'))return [[{id:7}]];if(sql.startsWith('INSERT')){if(fail&&++writes===3)throw Object.assign(Error('secret SQL'),{code:'ECONNRESET'});return [{insertId:id++}];}throw Error(sql);};
  return {calls,execute,getConnection:async()=>({execute,beginTransaction:async()=>calls.push('begin'),commit:async()=>calls.push('commit'),rollback:async()=>calls.push('rollback'),release:()=>calls.push('release')})};
 }
 async function multipart(bytes,type='application/pdf',extra=false){const form=new FormData();form.append('file',new Blob([bytes],{type}),'../../cardapio.pdf');if(extra)form.append('tenant_id','999');const response=new Response(form);return {body:Buffer.from(await response.arrayBuffer()),headers:{Authorization:headers.Authorization,'Content-Type':response.headers.get('content-type')}};}

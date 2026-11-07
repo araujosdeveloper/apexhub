@@ -1,6 +1,6 @@
 # Importação de cardápio por IA no Master
 
-Acesso: `/master.html#menu-import`, menu **Importar cardápio com IA**. Mantém sidebar e header do Master, paleta Dark ApexHub e layout responsivo. Não requer nova migração nem nova chave de IA; reutiliza `.env.ai` configurado na etapa anterior.
+Acesso: `/master.html#menu-import`, menu **Importar cardápio com IA**. Mantém sidebar e header do Master, paleta Dark Apex Delivery e layout responsivo. Não requer nova migração nem nova chave de IA; reutiliza `.env.ai` configurado na etapa anterior.
 
 ## Fluxo visual
 

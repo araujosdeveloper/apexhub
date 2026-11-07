@@ -27,6 +27,13 @@ CREATE TABLE IF NOT EXISTS subscriptions (
  trial_ends_at DATETIME NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY (company_id) REFERENCES companies(id)
 ) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS subscription_plan_requests (
+ company_id INT UNSIGNED PRIMARY KEY, plan_code ENUM('essencial','pro') NOT NULL,
+ status ENUM('pending','accepted','declined') NOT NULL DEFAULT 'pending',
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS categories (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id INT UNSIGNED NOT NULL,
  name VARCHAR(120) NOT NULL, sort_order INT NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -88,8 +95,7 @@ CREATE TABLE IF NOT EXISTS orders (
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS order_items (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED NOT NULL, product_id INT UNSIGNED NOT NULL,
- product_name VARCHAR(160) NOT NULL, quantity INT UNSIGNED NOT NULL, addons_snapshot JSON NULL,
- item_notes VARCHAR(500) NOT NULL DEFAULT '',
+ product_name VARCHAR(160) NOT NULL, quantity INT UNSIGNED NOT NULL, item_notes VARCHAR(500) NOT NULL DEFAULT '', addons_snapshot JSON NULL,
  unit_price DECIMAL(10,2) NOT NULL, total_price DECIMAL(10,2) NOT NULL,
  CHECK (quantity > 0), CHECK (unit_price >= 0), CHECK (total_price >= 0),
  FOREIGN KEY (order_id) REFERENCES orders(id), FOREIGN KEY (product_id) REFERENCES products(id)
