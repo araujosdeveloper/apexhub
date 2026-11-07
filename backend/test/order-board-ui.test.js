@@ -120,3 +120,14 @@ test('gestor e via de entrega exibem cupom e desconto; cozinha preserva foco na 
 test('lista de pedidos é padrão e mantém quadro, ações e detalhes disponíveis',async()=>{
  const ui=await page();assert.match(ui.nodes.get('orders-board').innerHTML,/order-list-table/);assert.match(ui.nodes.get('orders-board').innerHTML,/data-action="details"/);assert.match(ui.nodes.get('orders-board').innerHTML,/Aceitar e preparar/);ui.run("orderLayout='board';state.fingerprint='';render()");assert.doesNotMatch(ui.nodes.get('orders-board').innerHTML,/order-list-table/);assert.match(ui.nodes.get('orders-board').innerHTML,/stage-heading/);
 });
+
+test('observação por item aparece escapada na cozinha e no comprovante', async () => {
+ const order = makeOrder();
+ order.items[0].item_notes = 'Sem milho <img src=x>';
+ const p = await page({ kitchen: true, orders: [order] });
+ const rendered = p.run('itemsHtml(state.orders[0])');
+ assert.match(rendered, /Sem milho &lt;img/);
+ assert.doesNotMatch(rendered, /<img src=x>/);
+ p.run('printOrder(12)');
+ assert.match(p.nodes.get('print-ticket').innerHTML, /Sem milho &lt;img/);
+});

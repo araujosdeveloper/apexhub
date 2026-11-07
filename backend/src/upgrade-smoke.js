@@ -27,13 +27,14 @@ async function verifyUpgradeSmoke(db) {
   const coverSaved=await request('/api/admin/store-profile/images/banner',{method:'POST',headers:{Cookie:cookie,'Content-Type':coverMultipart.headers.get('content-type')},body:Buffer.from(await coverMultipart.arrayBuffer())});assert.equal(coverSaved.status,200);storeProfile.banner_url=(await coverSaved.json()).image_url;assert.equal((await request(storeProfile.banner_url)).status,200);
   assert.equal((await request('/api/admin/operations',json('PUT',operations,cookie))).status,200);
   const menu = await (await request('/api/menu/' + slug)).json(); assert.equal(menu.products[0].addon_groups[0].options[0].name, 'Queijo');assert.deepEqual(menu.operations.store_profile,storeProfile);
-  const payload = { company_id: me.user.company_id, customer: { name: 'Ensaio', phone: randomUUID(), street: 'Rua', number: '1', neighborhood: 'Centro' }, items: [{ product_id: product.id, quantity: 2, option_ids: ['cheese'], addon_version: 1 }], payment_method: 'Dinheiro', delivery_fee: '3.00' };
+  const payload = { company_id: me.user.company_id, customer: { name: 'Ensaio', phone: randomUUID(), street: 'Rua', number: '1', neighborhood: 'Centro' }, items: [{ product_id: product.id, quantity: 2, option_ids: ['cheese'], addon_version: 1, notes: 'Sem milho' }], payment_method: 'Dinheiro', delivery_fee: '3.00' };
   const key = randomUUID(); const order = await request('/api/orders', json('POST', payload, null, key)); assert.equal(order.status, 201); assert.equal((await order.json()).total_amount, 28);
   assert.equal((await request('/api/orders', json('POST', payload, null, key))).status, 200);
   const pickup = await request('/api/orders', json('POST', { ...payload, fulfillment_method: 'pickup', delivery_fee: '0.00', customer: { name: 'Ensaio', phone: payload.customer.phone } }, null, randomUUID())); assert.equal(pickup.status, 201); assert.equal((await pickup.json()).total_amount, 25);
   const orders = await (await request('/api/admin/orders', { headers: { Cookie: cookie } })).json();
   assert.equal(orders.length, 2); assert.equal(orders[0].items[0].addons_snapshot[0].name, 'Queijo');
   const board = await (await request('/api/admin/orders/board?scope=kitchen', { headers: { Cookie: cookie } })).json();
+  assert.equal(board.orders[0].items[0].item_notes, 'Sem milho');
   assert.equal(board.total, 2); assert.equal(board.counts.pending, 2); assert.equal(board.orders[0].items[0].addons_snapshot[0].name, 'Queijo');
   assert.match(board.orders[0].created_at, /Z$/);
   const deliveryOrder = board.orders.find(order => order.fulfillment_method === 'delivery');

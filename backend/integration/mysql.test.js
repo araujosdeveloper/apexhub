@@ -60,6 +60,18 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  assert.equal(orderA.order_id, orderB.order_id); assert.equal(orderA.total_amount, 24.7);
  const [count] = await db.execute('SELECT COUNT(*) AS total FROM orders WHERE company_id = ?', [a.id]); assert.equal(count[0].total, 1);
  t.diagnostic('Checkout concorrente criou somente um pedido com preço calculado no servidor.');
+ const instructions = { ...payload, items: [{ product_id: product.id, quantity: 1, notes: 'Sem milho' }, { product_id: product.id, quantity: 1, notes: 'Com milho' }] };
+ const noted = await request('/api/orders', json('POST', instructions, null, randomUUID()));
+ assert.equal(noted.status, 201);
+ const notedId = (await noted.json()).order_id;
+ const [notedItems] = await db.execute('SELECT item_notes,quantity FROM order_items WHERE order_id=? ORDER BY item_notes', [notedId]);
+ assert.deepEqual(notedItems.map(item => [item.item_notes,item.quantity]), [['Com milho',1],['Sem milho',1]]);
+ // Keep the remainder of the existing scenario's counts unchanged.
+ await db.execute('DELETE FROM checkout_requests WHERE order_id=?', [notedId]);
+ await db.execute('DELETE FROM order_tracking WHERE order_id=?', [notedId]);
+ await db.execute('DELETE FROM order_items WHERE order_id=?', [notedId]);
+ await db.execute('DELETE FROM orders WHERE id=? AND company_id=?', [notedId,a.id]);
+
  const hidden = await request('/api/admin/orders/' + orderA.order_id + '/status', json('PATCH', { status: 'preparing' }, b.cookie)); assert.equal(hidden.status, 404);
  assert.deepEqual(await (await request('/api/admin/orders', { headers: { Cookie: b.cookie } })).json(), []);
  const changed = await request('/api/orders', json('POST', { ...payload, customer: { ...payload.customer, number: '20' } }, null, key)); assert.equal(changed.status, 409);

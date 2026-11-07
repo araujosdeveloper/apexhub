@@ -111,7 +111,7 @@ function installCustomers(app, db, auth) {
         FROM orders o JOIN members m ON m.id = o.customer_id AND m.company_id = o.company_id
         WHERE o.company_id = ? AND m.contact_key = ? ORDER BY o.created_at DESC,o.id DESC LIMIT ${page.limit} OFFSET ${page.offset}`, [companyId,companyId,key]);
       let items = [];
-      if (orders.length) [items] = await conn.execute(`SELECT oi.id,oi.order_id,oi.product_id,oi.product_name,oi.quantity,oi.unit_price,oi.total_price,oi.addons_snapshot
+      if (orders.length) [items] = await conn.execute(`SELECT oi.id,oi.order_id,oi.product_id,oi.product_name,oi.quantity,oi.unit_price,oi.total_price,oi.addons_snapshot,oi.item_notes
         FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')}) ORDER BY oi.id`, [companyId,...orders.map(order => order.id)]);
       const [favorites] = await conn.execute(`${MEMBERS} SELECT oi.product_id,oi.product_name,SUM(oi.quantity) AS quantity
         FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN members m ON m.id = o.customer_id AND m.company_id = o.company_id
