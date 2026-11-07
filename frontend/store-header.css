@@ -7,3 +7,10 @@
 @media(max-width:1000px){.store-footer .store-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.store-footer .store-location{grid-column:1/-1;grid-template-columns:minmax(140px,30%) minmax(0,1fr)}.store-footer .store-map-art,.store-footer .store-map-art svg{height:100%;min-height:140px}}
 @media(max-width:600px){.store-footer{padding-block:24px}.store-footer .store-info-grid{grid-template-columns:1fr}.store-footer .store-location{grid-column:auto;grid-template-columns:1fr}.store-footer .store-map-art,.store-footer .store-map-art svg{height:110px;min-height:110px}.store-footer-bottom{flex-direction:column}}
 body.apex-menu{padding-bottom:0}.store-footer{padding-bottom:calc(30px + env(safe-area-inset-bottom))}body:has(#cart-bar:not(.hidden)) .store-footer{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+
+/* Estrutura pública fluida: header, catálogo e rodapé compartilham a largura da página. */
+html:has(body.apex-menu),body.apex-menu{width:100%;max-width:none;margin:0;overflow-x:clip}
+body.apex-menu{min-width:0}
+body.apex-menu .menu-store-header,body.apex-menu .menu-category-tabs,body.apex-menu .menu-search-results,body.apex-menu .menu-content,body.apex-menu #cart-suggestions,body.apex-menu #order-received,body.apex-menu #cart-notice,body.apex-menu .store-footer{width:100%;max-width:none;margin-left:0;margin-right:0;box-sizing:border-box}
+body.apex-menu .menu-category-tabs,body.apex-menu .menu-search-results,body.apex-menu .menu-content{padding-left:var(--menu-page-padding);padding-right:var(--menu-page-padding)}
+body.apex-menu .menu-category{width:100%;max-width:none;margin-left:0;margin-right:0;box-sizing:border-box}
