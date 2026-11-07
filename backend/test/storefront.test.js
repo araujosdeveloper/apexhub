@@ -201,3 +201,24 @@ test('observação é escapada na sacola e não aceita conteúdo inválido', asy
  page.run("updateItemNotes(0, 'x'.repeat(501))");
  assert.equal(page.run('cart[0].notes'), '</textarea><img src=x>');
 });
+
+test('adicionais repetidos calculam preço, persistem e são enviados com observações', async () => {
+ const product={id:1,category_id:1,name:'Lanche',price:'12.35',addon_version:3,addon_groups:[{id:'extras',name:'Extras',min:1,max:3,options:[{id:'cheese',name:'Queijo',price:'2.50',max_quantity:3}]}]};
+ const p=await storefront({products:[product]});
+ p.run("addToCart(1); setAddonQuantity('cheese','2'); confirmAddons(); updateItemNotes(0,'Sem milho')");
+ assert.equal(p.run('cart[0].price'),'17.35');
+ assert.equal(p.run('cart[0].option_quantities.cheese'),2);
+ p.run('openCheckout()');assert.match(p.nodes.get('cart-items-list').innerHTML,/2× Queijo/);
+ const restored=await storefront({products:[product],storage:p.storage});
+ assert.equal(restored.run('cart[0].price'),'17.35');assert.equal(restored.run('cart[0].notes'),'Sem milho');
+ await restored.run('sendOrder()');
+ assert.deepEqual(JSON.parse(restored.requests[0].body).items[0].option_quantities,{cheese:2});
+});
+test('adicionais repetidos recusam excesso e separam configurações na sacola', async () => {
+ const product={id:1,category_id:1,name:'Lanche',price:'12.35',addon_version:3,addon_groups:[{id:'extras',name:'Extras',min:1,max:2,options:[{id:'cheese',name:'Queijo',price:'2.50',max_quantity:3}]}]};
+ const p=await storefront({products:[product]});
+ p.run("addToCart(1); setAddonQuantity('cheese','3'); confirmAddons()");assert.equal(p.run('cart.length'),0);
+ p.run("setAddonQuantity('cheese','2'); confirmAddons(); addToCart(1); setAddonQuantity('cheese','1'); confirmAddons()");
+ assert.equal(p.run('cart.length'),2);
+ p.run("addToCart(1); setAddonQuantity('cheese','1.5'); confirmAddons()");assert.equal(p.run('cart.length'),2);
+});

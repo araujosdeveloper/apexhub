@@ -355,3 +355,15 @@ test('checkout grava observação por linha e recusa reutilizar chave com outro 
  assert.equal(state.itemWrites.length, 2);
  assert.equal((await request('/api/orders', options({ ...body, items: [{ id: 1, quantity: 2, notes: 'Sem milho' }] }))).status, 409);
 });
+
+test('checkout calcula adicionais repetidos no servidor e protege reenvio com outra quantidade', async t => {
+ const groups=[{id:'extras',name:'Extras',min:0,max:3,options:[{id:'cheese',name:'Queijo',price:'2.50',active:true,max_quantity:3}]}];
+ const {db,state}=orderDb({products:[{id:1,name:'Lanche',price:'12.35',addon_version:1,addon_config:groups}]});
+ const request=await serve(t,db);
+ const body={...payload,items:[{id:1,quantity:2,addon_version:1,option_quantities:{cheese:2},price:0.01}]};
+ const options=data=>({method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'repeated-addons-checkout-1'},body:JSON.stringify(data)});
+ const created=await request('/api/orders',options(body));assert.equal(created.status,201);assert.equal((await created.json()).total_amount,34.7);
+ assert.equal(state.itemArgs[4],'17.35');assert.equal(JSON.parse(state.itemArgs[6])[0].quantity,2);
+ assert.equal((await request('/api/orders',options(body))).status,200);assert.equal(state.orderWrites,1);
+ assert.equal((await request('/api/orders',options({...body,items:[{...body.items[0],option_quantities:{cheese:1}}]}))).status,409);
+});

@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS product_options (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,tenant_id INT UNSIGNED NOT NULL,product_id INT UNSIGNED NOT NULL,
  option_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,group_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
  name VARCHAR(120) NOT NULL,additional_price DECIMAL(10,2) NOT NULL,max_quantity INT UNSIGNED NOT NULL DEFAULT 1,is_active BOOLEAN NOT NULL DEFAULT TRUE,
- created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY menu_option_key(tenant_id,product_id,option_key),CHECK(additional_price>=0),CHECK(max_quantity=1),
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY menu_option_key(tenant_id,product_id,option_key),CHECK(additional_price>=0),CONSTRAINT product_options_quantity_range CHECK(max_quantity BETWEEN 1 AND 20),
  FOREIGN KEY(tenant_id,product_id) REFERENCES products(company_id,id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS customers (

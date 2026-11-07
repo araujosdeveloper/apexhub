@@ -1,7 +1,7 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="/apex-tokens.css"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Adicionais do produto</title>
 <style>
-*{box-sizing:border-box}body{font:16px system-ui;color:#172139;background:#f4f6fa;margin:0}main{max-width:1000px;margin:32px auto;padding:0 20px}a{color:#2563eb}p{color:#657087;line-height:1.5}section{background:#fff;border:1px solid #e3e7ee;border-radius:12px;padding:24px;margin-top:20px}.grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px}label{display:block;margin:12px 0 6px}input,button{font:inherit}input{width:100%;padding:10px;border:1px solid #cbd2df;border-radius:6px}input[type=checkbox]{width:auto}button{background:#2563eb;color:white;border:0;border-radius:6px;padding:10px 16px;cursor:pointer;margin-top:12px}button:disabled{opacity:.5}.secondary{background:#edf2fa;color:#172139}.option{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:end;border-top:1px solid #e3e7ee;padding:10px 0}.actions{position:sticky;bottom:0;background:#f4f6fa;padding:18px 0;display:flex;gap:16px;align-items:center}#message{color:#b42318;min-height:24px}@media(max-width:650px){.grid,.option{grid-template-columns:1fr 1fr}}
-</style><link rel="stylesheet" href="/admin-theme.css" media="screen"><script src="/assisted-context.js"></script><script src="/frame-bridge.js"></script></head><body class="apex-view apex-view-addons"><main><a href="/catalog.html">← Voltar ao cardápio</a><h1>Adicionais do produto</h1><p id="product-name">Carregando…</p><p>Crie grupos como “Molhos” e “Extras”. Cada opção pode ser escolhida uma vez por unidade do produto. Mínimo zero torna o grupo opcional.</p>
+*{box-sizing:border-box}body{font:16px system-ui;color:#172139;background:#f4f6fa;margin:0}main{max-width:1000px;margin:32px auto;padding:0 20px}a{color:#2563eb}p{color:#657087;line-height:1.5}section{background:#fff;border:1px solid #e3e7ee;border-radius:12px;padding:24px;margin-top:20px}.grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px}label{display:block;margin:12px 0 6px}input,button{font:inherit}input{width:100%;padding:10px;border:1px solid #cbd2df;border-radius:6px}input[type=checkbox]{width:auto}button{background:#2563eb;color:white;border:0;border-radius:6px;padding:10px 16px;cursor:pointer;margin-top:12px}button:disabled{opacity:.5}.secondary{background:#edf2fa;color:#172139}.option{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:12px;align-items:end;border-top:1px solid #e3e7ee;padding:10px 0}.actions{position:sticky;bottom:0;background:#f4f6fa;padding:18px 0;display:flex;gap:16px;align-items:center}#message{color:#b42318;min-height:24px}@media(max-width:650px){.grid,.option{grid-template-columns:1fr 1fr}}
+</style><link rel="stylesheet" href="/admin-theme.css" media="screen"><script src="/assisted-context.js"></script><script src="/frame-bridge.js"></script></head><body class="apex-view apex-view-addons"><main><a href="/catalog.html">← Voltar ao cardápio</a><h1>Adicionais do produto</h1><p id="product-name">Carregando…</p><p>Crie grupos como “Molhos” e “Extras”. Defina quantas unidades de cada opção podem acompanhar uma unidade do produto. Mínimo e máximo do grupo contam unidades de adicionais. Mínimo zero torna o grupo opcional.</p>
 <form id="addons-form"><fieldset id="fields" disabled style="border:0;padding:0"><div id="groups"></div><button type="button" id="add-group" class="secondary">Adicionar grupo</button><div class="actions"><button id="save">Salvar adicionais</button><span id="message" role="status" aria-live="polite"></span></div></fieldset></form></main>
 <script>
 const $ = id => document.getElementById(id);
@@ -17,14 +17,15 @@ function addOption(container, option = { id: crypto.randomUUID(), name: '', pric
  const row = document.createElement('div'); row.className = 'option'; row.dataset.id = option.id;
  const name = field('Nome da opção', option.name, 'text', { required: true, maxLength: 120 }); name.input.dataset.key = 'name';
  const price = field('Preço adicional (R$)', option.price, 'number', { required: true, min: '0', max: '9999.99', step: '0.01' }); price.input.dataset.key = 'price';
+ const maximum = field('Limite por produto', option.max_quantity || 1, 'number', { required: true, min: '1', max: '20', step: '1' }); maximum.input.dataset.key = 'max_quantity';
  const active = field('Disponível ', '', 'checkbox', { checked: option.active }); active.input.dataset.key = 'active';
- row.append(name.wrapper, price.wrapper, active.wrapper, button('Remover opção', () => row.remove())); container.append(row);
+ row.append(name.wrapper, price.wrapper, maximum.wrapper, active.wrapper, button('Remover opção', () => row.remove())); container.append(row);
 }
 function addGroup(group = { id: crypto.randomUUID(), name: '', min: 0, max: 1, options: [{ id: crypto.randomUUID(), name: '', price: '0.00', active: true }] }) {
  if ($('groups').children.length >= 12) return;
  const section = document.createElement('section'); section.dataset.id = group.id;
  const heading = document.createElement('h2'); heading.textContent = 'Grupo de adicionais'; const grid = document.createElement('div'); grid.className = 'grid';
- for (const [key, label, type, attributes] of [['name', 'Nome do grupo', 'text', { maxLength: 120 }], ['min', 'Mínimo de escolhas', 'number', { min: '0', max: '20' }], ['max', 'Máximo de escolhas', 'number', { min: '1', max: '20' }]]) {
+ for (const [key, label, type, attributes] of [['name', 'Nome do grupo', 'text', { maxLength: 120 }], ['min', 'Mínimo de unidades', 'number', { min: '0', max: '20' }], ['max', 'Máximo de unidades', 'number', { min: '1', max: '20' }]]) {
   const item = field(label, group[key], type, { required: true, ...attributes }); item.input.dataset.key = key; grid.append(item.wrapper);
  }
  const options = document.createElement('div'); options.className = 'options'; group.options.forEach(option => addOption(options, option));
@@ -41,7 +42,7 @@ $('addons-form').onsubmit = async event => {
  event.preventDefault(); $('save').disabled = true; $('message').textContent = '';
  const value = (node, key) => node.querySelector('[data-key="' + key + '"]').value;
  const groups = [...$('groups').children].map(section => ({ id: section.dataset.id, name: value(section, 'name'), min: Number(value(section, 'min')), max: Number(value(section, 'max')),
-  options: [...section.querySelector('.options').children].map(row => ({ id: row.dataset.id, name: value(row, 'name'), price: Number(value(row, 'price')).toFixed(2), active: row.querySelector('[data-key="active"]').checked })) }));
+  options: [...section.querySelector('.options').children].map(row => ({ id: row.dataset.id, name: value(row, 'name'), price: Number(value(row, 'price')).toFixed(2), max_quantity: Number(value(row, 'max_quantity')), active: row.querySelector('[data-key="active"]').checked })) }));
  try { render(await api('PUT', { version, groups })); $('message').textContent = 'Adicionais salvos.'; }
  catch (error) { $('message').textContent = error.message; }
  finally { $('save').disabled = false; }

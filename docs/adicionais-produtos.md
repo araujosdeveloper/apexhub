@@ -55,3 +55,13 @@ O cardápio aceita observação opcional de até 500 caracteres por linha, no di
 O checkout recebe `items[].notes`, valida tipo, tamanho e caracteres de controle, preserva em `order_items.item_notes` e considera a observação na normalização e no hash de idempotência. Observação vazia mantém os hashes anteriores. A instrução aparece no gestor, cozinha, impressão manual e histórico do cliente. O link público de acompanhamento continua omitindo texto livre, conforme seu contrato de privacidade.
 
 A migração aditiva `016-item-instructions.sql` inclui a coluna com padrão vazio, integrada ao planejador de atualização. O esquema inicial já contém a coluna. A suíte local cobre diferenciação de preparos, persistência na sacola, escape de HTML e reenvio com conflito. Integração MySQL e ensaio de atualização foram ampliados, mas precisam ser executados no host antes da publicação pelo atualizador habitual. Esta alteração ainda não foi publicada.
+
+## Quantidades de adicionais — preparada para revisão
+
+Cada opção pode ter `max_quantity` inteiro entre 1 e 20 por unidade de produto. O padrão é 1, preservando cadastros e seleções anteriores. O mínimo e máximo do grupo agora contam unidades de adicionais. Exemplo: grupo com máximo 3 permite dois queijos e um bacon, sujeitos ao limite individual de cada opção. Configure os limites em Adicionais do produto.
+
+No cardápio, opções com limite maior que um apresentam campo de quantidade; limite um conserva a caixa de seleção. A sacola, recarga, cotação de cupom e checkout preservam as quantidades. O servidor calcula preço do produto mais a soma de preço do adicional multiplicado por sua quantidade; o resultado é multiplicado pela quantidade de produtos da linha. Quantidades de adicionais são registradas no snapshot e exibidas no gestor, cozinha, impressão, histórico e acompanhamento.
+
+O contrato aceita `items[].option_quantities`, objeto com identificador e quantidade inteira positiva. `option_ids` continua aceito como seleção de uma unidade. Se ambos forem enviados, as chaves de quantidades devem pertencer à seleção explícita. Quantidades iguais a um são normalizadas para o formato anterior; repetições entram no hash de idempotência e distinguem as linhas. Contagens zero, negativas, fracionárias, fora dos limites, opções pausadas ou de outro produto são recusadas.
+
+A projeção `product_options` mantém `max_quantity` na mesma transação do cadastro. A migração 017 substitui a restrição antiga de uma unidade pela faixa 1–20, sem alterar registros. O atualizador detecta a restrição nomeada para não reaplicar a migração. Esquema inicial, integrações MySQL e ensaio na cópia foram atualizados. A execução MySQL e a conferência visual continuam obrigatórias antes de publicação no host.
