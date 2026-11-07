@@ -52,7 +52,7 @@ test('cardápio API: disponibilidade explícita é idempotente e exclusão prese
 });
 test('cardápio API: valida IDs, preços, nomes, URLs e limitações reais dos opcionais',()=>{
  for(const id of ['0','1 OR 1','-1','8.0','4294967296'])assert.throws(()=>positiveId(id));
- for(const data of [{...input,price:'-1'},{...input,price:19.9},{...input,category_id:'3'},{...input,image_url:'javascript:alert(1)'},{...input,image_url:'https://user:pass@example.com/x'},{...input,name:''},{...input,options:[{name:'Extra',additional_price:'2.50',max_quantity:2}]}])assert.throws(()=>productInput(data));
+ for(const data of [{...input,price:'-1'},{...input,price:19.9},{...input,category_id:'3'},{...input,image_url:'javascript:alert(1)'},{...input,image_url:'https://user:pass@example.com/x'},{...input,name:''},{...input,options:[{name:'Extra',additional_price:'2.50',max_quantity:21}]}])assert.throws(()=>productInput(data));
  assert.equal(productInput({...input,price:'0'}).price,'0.00');assert.throws(()=>categoryInput({name:'Bebidas',sort_order:-1}));
 });
 test('cardápio API: falha ao sincronizar adicionais reverte produto sem vazar credenciais',async t=>{
@@ -61,4 +61,11 @@ test('cardápio API: falha ao sincronizar adicionais reverte produto sem vazar c
 test('opcionais: upsert conserva IDs e remoção de opções tem escopo de tenant/produto',async()=>{
  const calls=[],conn={execute:async(sql,args)=>{calls.push({sql,args});return [{}];}};
  await syncOptions(conn,7,8,[{id:'g',options:[{id:'cheese',name:'Queijo',price:'2.50',active:true}]}]);assert.match(calls[0].sql,/ON DUPLICATE KEY UPDATE/);assert.deepEqual(calls[1].args,[7,8,'cheese']);assert.match(calls[1].sql,/WHERE tenant_id=\? AND product_id=\?/);await syncOptions(conn,7,8,[]);assert.deepEqual(calls[2].args,[7,8]);
+});
+
+test('opcionais repetidos têm limite validado e projeção relacional atualizada', async () => {
+ const data=productInput({...input,options:[{name:'Queijo',additional_price:'2.50',max_quantity:3}]});
+ assert.equal(data.groups[0].max,3);assert.equal(data.groups[0].options[0].max_quantity,3);
+ const calls=[];await syncOptions({execute:async(sql,args)=>{calls.push({sql,args});return [{}];}},7,8,data.groups);
+ assert.equal(calls[0].args[6],3);assert.match(calls[0].sql,/max_quantity=VALUES\(max_quantity\)/);
 });

@@ -131,3 +131,11 @@ test('observação por item aparece escapada na cozinha e no comprovante', async
  p.run('printOrder(12)');
  assert.match(p.nodes.get('print-ticket').innerHTML, /Sem milho &lt;img/);
 });
+
+
+test('cozinha e impressão exibem a quantidade histórica de cada adicional', async () => {
+ const order=makeOrder();order.items[0].addons_snapshot[0].quantity=2;
+ const p=await page({kitchen:true,orders:[order]});
+ assert.match(p.run('itemsHtml(state.orders[0])'),/2× Queijo/);
+ p.run('printOrder(12)');assert.match(p.nodes.get('print-ticket').innerHTML,/2× Queijo/);
+});

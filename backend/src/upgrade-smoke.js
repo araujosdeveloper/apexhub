@@ -90,6 +90,14 @@ async function verifyUpgradeSmoke(db) {
   assert.equal((await request('/api/tenant/menu/products/'+menuProductId+'/availability',json('PUT',{is_available:false},cookie))).status,200);
   assert.equal((await request('/api/tenant/menu/products/'+menuProductId,json('DELETE',{},cookie))).status,200);
   const imported=await request('/api/tenant/menu/confirm-import',{method:'POST',headers:{Authorization:'Bearer '+signed.access_token,'Content-Type':'application/json'},body:JSON.stringify({categories:[{name:'Importação ensaio',products:[{name:'Item importado',description:'Revisado',price:'7.50'}]}]})});assert.equal(imported.status,201);assert.equal((await imported.json()).data.product_count,1);
+  // Exercita a restrição migrada e o preço em uma nova compra na cópia descartável.
+  const repeatedGroups=[{id:'extras',name:'Extras',min:1,max:3,options:[{id:'cheese',name:'Queijo',price:'2.50',active:true,max_quantity:3}]}];
+  assert.equal((await request('/api/admin/products/'+product.id+'/addons',json('PUT',{version:1,groups:repeatedGroups},cookie))).status,200);
+  assert.equal((await request('/api/admin/operations',json('PUT',operations,cookie))).status,200);
+  const repeatedOrder=await request('/api/orders',json('POST',{...payload,items:[{product_id:product.id,quantity:2,addon_version:2,option_quantities:{cheese:2},notes:'Sem milho'}]},null,randomUUID()));
+  assert.equal(repeatedOrder.status,201);assert.equal((await repeatedOrder.json()).total_amount,33);
+  const [[repeatedOption]]=await db.execute('SELECT max_quantity FROM product_options WHERE tenant_id=? AND product_id=?',[me.user.company_id,product.id]);assert.equal(repeatedOption.max_quantity,3);
+  await assert.rejects(db.execute('UPDATE product_options SET max_quantity=21 WHERE tenant_id=? AND product_id=?',[me.user.company_id,product.id]),error=>error.code==='ER_CHECK_CONSTRAINT_VIOLATED');
   await require('../integration/master').verifyMaster(pool,request,{a:{id:me.user.company_id,cookie},b:{id:me.user.company_id,cookie},json});
 }
 module.exports = { verifyUpgradeSmoke };

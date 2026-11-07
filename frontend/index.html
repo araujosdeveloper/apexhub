@@ -150,7 +150,7 @@
                     if (!product || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) { removedItems = true; return []; }
                     try {
                         if (item.addon_version && item.addon_version !== product.addon_version) throw new Error('Adicionais alterados');
-                        const restored = customizedItem(product, item.option_ids || [], item.notes || '');
+                        const restored = customizedItem(product, item.option_ids || [], item.notes || '', item.option_quantities || {});
                         return [{ ...restored, quantity: item.quantity }];
                     } catch { removedItems = true; return []; }
                 });
@@ -263,7 +263,7 @@
         function couponContext() {
             const selection = checkoutSelection();
             return JSON.stringify({ companyId, code: document.getElementById('coupon-code').value.trim().toUpperCase(), phone: document.getElementById('customer-phone').value.trim(), method: selection.method, neighborhood: selection.neighborhood, fee: selection.fee,
-                items: cart.map(item => [item.id, item.quantity, item.option_ids || [], item.addon_version || 0, item.price, item.notes || '']) });
+                items: cart.map(item => [item.id, item.quantity, item.option_ids || [], item.addon_version || 0, item.price, item.notes || '', item.option_quantities || null]) });
         }
         function updateCheckoutTotal() {
             const selection = checkoutSelection(), signature = couponContext();
@@ -295,7 +295,7 @@
             const request = ++couponRequest, signature = couponContext(); applyingCoupon = true; updateCheckoutTotal();
             document.getElementById('coupon-message').textContent = 'Conferindo cupom…';
             try {
-                const response = await fetch('/api/coupons/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId, coupon_code: code, phone, fulfillment_method: selection.method, neighborhood: selection.neighborhood, items: cart.map(({ id, quantity, option_ids, addon_version, notes }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}) })) }) });
+                const response = await fetch('/api/coupons/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId, coupon_code: code, phone, fulfillment_method: selection.method, neighborhood: selection.neighborhood, items: cart.map(({ id, quantity, option_ids, addon_version, notes, option_quantities }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}), ...(option_quantities ? { option_quantities } : {}) })) }) });
                 const result = await response.json();
                 if (request !== couponRequest) return;
                 if (signature !== couponContext()) throw new Error('O pedido mudou. Aplique o cupom novamente.');
@@ -309,24 +309,34 @@
         }
         document.getElementById('customer-phone').oninput = updateCheckoutTotal;
         let customization = null;
-        function customizedItem(product, ids = [], notes = '') {
+        function customizedItem(product, ids = [], notes = '', counts = {}) {
             if (typeof notes !== 'string' || notes.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(notes)) throw new Error('Use uma observação de até 500 caracteres.');
             notes = notes.trim();
             const groups = product.addon_groups || [], selected = new Set(ids), options = [];
             if (!Array.isArray(ids) || selected.size !== ids.length) throw new Error('Seleção inválida.');
+            const entries = Object.entries(counts);
+            if (entries.some(([id, count]) => !selected.has(id) || !Number.isSafeInteger(count) || count < 1 || count > 20)) throw new Error('Quantidades de adicionais inválidas.');
+            const quantity = id => Object.hasOwn(counts, id) ? counts[id] : 1;
             for (const group of groups) {
                 const choices = group.options.filter(option => selected.has(option.id));
-                if (choices.length < group.min || choices.length > group.max) throw new Error(`Escolha de ${group.min} a ${group.max} opções em ${group.name}.`);
-                choices.forEach(option => { selected.delete(option.id); options.push({ ...option, group_name: group.name }); });
+                const count = choices.reduce((sum, option) => sum + quantity(option.id), 0);
+                if (count < group.min || count > group.max) throw new Error(`Escolha de ${group.min} a ${group.max} unidades em ${group.name}.`);
+                choices.forEach(option => {
+                    const count = quantity(option.id);
+                    if (count > (option.max_quantity || 1)) throw new Error('Quantidade excede o limite de ' + option.name + '.');
+                    selected.delete(option.id); options.push({ ...option, ...(count > 1 ? { quantity: count } : {}), group_name: group.name });
+                });
             }
             if (selected.size) throw new Error('Adicional indisponível.');
-            const cents = Math.round(Number(product.price) * 100) + options.reduce((sum, option) => sum + Math.round(Number(option.price) * 100), 0);
-            return { ...product, ...(notes ? { notes } : {}), price: (cents / 100).toFixed(2), option_ids: [...ids].sort(), selected_options: options, addon_version: groups.length ? product.addon_version : 0 };
+            const cents = Math.round(Number(product.price) * 100) + options.reduce((sum, option) => sum + Math.round(Number(option.price) * 100) * (option.quantity || 1), 0);
+            const repeated = options.some(option => option.quantity > 1);
+            const option_quantities = Object.fromEntries([...ids].sort().map(id => [id, quantity(id)]));
+            return { ...product, ...(notes ? { notes } : {}), ...(repeated ? { option_quantities } : {}), price: (cents / 100).toFixed(2), option_ids: [...ids].sort(), selected_options: options, addon_version: groups.length ? product.addon_version : 0 };
         }
-        function addCustomizedItem(product, ids, notes = '') {
+        function addCustomizedItem(product, ids, notes = '', counts = {}) {
             if (cart.filter(item => item.id === product.id).reduce((sum, item) => sum + item.quantity, 0) >= 99) throw new Error('Limite de 99 unidades por produto.');
-            const item = customizedItem(product, ids, notes);
-            const existing = cart.find(other => other.id === product.id && JSON.stringify(other.option_ids || []) === JSON.stringify(item.option_ids) && (other.notes || '') === (item.notes || ''));
+            const item = customizedItem(product, ids, notes, counts);
+            const existing = cart.find(other => other.id === product.id && JSON.stringify(other.option_ids || []) === JSON.stringify(item.option_ids) && (other.notes || '') === (item.notes || '') && JSON.stringify(other.option_quantities || null) === JSON.stringify(item.option_quantities || null));
             if (existing) existing.quantity++; else cart.push({ ...item, quantity: 1 });
             updateCartUI();
         }
@@ -335,10 +345,10 @@
             const product = storeData.products.find(p => p.id === productId);
             if (!product) return;
             if ((product.addon_groups || []).length) {
-                customization = { product, ids: new Set() };
+                customization = { product, ids: new Set(), quantities: new Map() };
                 document.getElementById('item-notes').value = '';
                 document.getElementById('addons-title').textContent = product.name;
-                document.getElementById('addons-options').innerHTML = (product.addon_groups || []).map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-secondary">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max}</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span><input type="checkbox" onchange="toggleAddon('${option.id}')"> ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
+                document.getElementById('addons-options').innerHTML = (product.addon_groups || []).map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-secondary">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max} unidades</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span>${(option.max_quantity || 1) > 1 ? `<input type="number" class="w-16 border rounded px-2" min="0" max="${option.max_quantity}" step="1" value="0" aria-label="Quantidade de ${escapeHtml(option.name)}" onchange="this.value = setAddonQuantity('${option.id}', this.value)">` : `<input type="checkbox" onchange="toggleAddon('${option.id}')">`} ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
                 document.getElementById('addons-error').textContent = '';
                 document.getElementById('confirm-addons').textContent = `Adicionar · a partir de R$ ${Number(product.price).toFixed(2)}`;
                 document.getElementById('addons-modal').classList.remove('hidden');
@@ -350,7 +360,23 @@
         function toggleAddon(id) {
             if (!customization) return;
             if (customization.ids.has(id)) customization.ids.delete(id); else customization.ids.add(id);
-            const cents = Math.round(Number(customization.product.price) * 100) + customization.product.addon_groups.flatMap(group => group.options).filter(option => customization.ids.has(option.id)).reduce((sum, option) => sum + Math.round(Number(option.price) * 100), 0);
+            updateAddonTotal();
+        }
+        function setAddonQuantity(id, value) {
+            if (!customization) return 0;
+            const option = customization.product.addon_groups.flatMap(group => group.options).find(option => option.id === id);
+            const count = typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
+            if (!option || !Number.isSafeInteger(count) || count < 0 || count > (option.max_quantity || 1)) {
+                document.getElementById('addons-error').textContent = 'Confira a quantidade e o limite do adicional.';
+                return customization.quantities.get(id) || 0;
+            }
+            if (count) { customization.ids.add(id); customization.quantities.set(id, count); }
+            else { customization.ids.delete(id); customization.quantities.delete(id); }
+            updateAddonTotal();
+            return count;
+        }
+        function updateAddonTotal() {
+            const cents = Math.round(Number(customization.product.price) * 100) + customization.product.addon_groups.flatMap(group => group.options).filter(option => customization.ids.has(option.id)).reduce((sum, option) => sum + Math.round(Number(option.price) * 100) * (customization.quantities.get(option.id) || 1), 0);
             document.getElementById('confirm-addons').textContent = `Adicionar · R$ ${(cents / 100).toFixed(2)}`;
             document.getElementById('addons-error').textContent = '';
         }
@@ -358,13 +384,13 @@
         document.addEventListener?.('keydown', event => { if (event.key === 'Escape' && customization) closeAddons(); });
         function confirmAddons() {
             if (!customization || sendingOrder) return;
-            try { addCustomizedItem(customization.product, [...customization.ids], document.getElementById('item-notes').value); closeAddons(); }
+            try { addCustomizedItem(customization.product, [...customization.ids], document.getElementById('item-notes').value, Object.fromEntries(customization.quantities)); closeAddons(); }
             catch (error) { document.getElementById('addons-error').textContent = error.message; }
         }
         function updateItemNotes(index, value) {
             if (sendingOrder || !cart[index]) return;
             try {
-                const item = customizedItem(storeData.products.find(product => product.id === cart[index].id), cart[index].option_ids || [], value);
+                const item = customizedItem(storeData.products.find(product => product.id === cart[index].id), cart[index].option_ids || [], value, cart[index].option_quantities || {});
                 cart[index] = { ...item, quantity: cart[index].quantity };
                 updateCartUI();
             } catch (error) { document.getElementById('cart-notice').textContent = error.message; }
@@ -381,7 +407,7 @@
         }
 
         function updateCartUI() {
-            storageSet(cartStorageKey, cart.map(({ id, quantity, option_ids, addon_version, notes }) => ({ id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}) })));
+            storageSet(cartStorageKey, cart.map(({ id, quantity, option_ids, addon_version, notes, option_quantities }) => ({ id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}), ...(option_quantities ? { option_quantities } : {}) })));
             renderSuggestions();
             if (checkoutOpen && cart.length) openCheckout();
             const cartBar = document.getElementById('cart-bar');
@@ -410,7 +436,7 @@
                 listContainer.innerHTML += `
                     <div class="flex justify-between items-center py-2">
                         <div>
-                            <p class="font-bold text-sm">${escapeHtml(item.name)}</p><p class="text-xs text-secondary">${(item.selected_options || []).map(option => escapeHtml(option.name) + (Number(option.price) ? " (+ R$ " + Number(option.price).toFixed(2) + ")" : "")).join(", ")}</p>
+                            <p class="font-bold text-sm">${escapeHtml(item.name)}</p><p class="text-xs text-secondary">${(item.selected_options || []).map(option => ((option.quantity || 1) > 1 ? option.quantity + '× ' : '') + escapeHtml(option.name) + (Number(option.price) ? " (+ R$ " + Number(option.price).toFixed(2) + ")" : "")).join(", ")}</p>
                             <label class="block text-sm" for="cart-note-${index}">Observação deste item</label><textarea id="cart-note-${index}" maxlength="500" rows="2" class="w-full border rounded p-2" onchange="updateItemNotes(${index}, this.value)">${escapeHtml(item.notes || '')}</textarea><p class="text-xs text-secondary">Vale para todas as unidades desta linha. Adicione novamente para um preparo diferente.</p>
                             <p class="text-xs text-secondary">Qtd: ${item.quantity} x R$ ${Number(item.price).toFixed(2)}</p>
                             <div class="flex items-center gap-3 mt-2">
@@ -457,7 +483,7 @@
             const orderPayload = {
                 company_id: companyId,
                 customer: { name, phone, street, number, neighborhood },
-                items: cart.map(({ id, quantity, option_ids, addon_version, notes }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}) })),
+                items: cart.map(({ id, quantity, option_ids, addon_version, notes, option_quantities }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}), ...(option_quantities ? { option_quantities } : {}) })),
                 payment_method: payment
             };
             // Conserva o conteúdo dos reenvios de delivery gratuitos anteriores a esta atualização.
