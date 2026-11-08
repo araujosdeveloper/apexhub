@@ -245,9 +245,10 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
    const itemNotesMigration=fs.readFileSync(path.join(__dirname,'../../database/016-item-instructions.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\border_items\b/g,names.order_items);
    for(const sql of itemNotesMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
    await connection.execute(`UPDATE ${names.order_items} SET item_notes='Sem cebola' WHERE id=1`);const [[itemNote]]=await connection.query(`SELECT item_notes FROM ${names.order_items} WHERE id=1`);assert.equal(itemNote.item_notes,'Sem cebola');
-   const quantityMigration=fs.readFileSync(path.join(__dirname,'../../database/017-addon-quantities.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\bproduct_options\b/g,names.product_options);
+   const quantityConstraint='quantity_range_'+suffix;
+   const quantityMigration=fs.readFileSync(path.join(__dirname,'../../database/017-addon-quantities.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\bproduct_options\b/g,names.product_options).replaceAll('product_options_quantity_range',quantityConstraint);
    for(const sql of quantityMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
-   const [[quantityRule]]=await connection.query(`SELECT CONSTRAINT_NAME AS name FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND CONSTRAINT_TYPE='CHECK' AND CONSTRAINT_NAME='product_options_quantity_range'`,[names.product_options]);assert.ok(quantityRule);
+   const [[quantityRule]]=await connection.execute(`SELECT CONSTRAINT_NAME AS name FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND CONSTRAINT_TYPE='CHECK' AND CONSTRAINT_NAME=?`,[names.product_options,quantityConstraint]);assert.ok(quantityRule);
    await connection.execute(`UPDATE ${names.product_options} SET max_quantity=2 WHERE tenant_id=1 AND product_id=1 AND option_key='cheese'`);
    await assert.rejects(connection.execute(`UPDATE ${names.product_options} SET max_quantity=21 WHERE tenant_id=1 AND product_id=1 AND option_key='cheese'`));
    const [master]=await connection.execute(`INSERT INTO ${names.platform_admins}(name,email,password_hash) VALUES ('Teste','master@example.com','fixture')`);
