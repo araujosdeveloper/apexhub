@@ -110,9 +110,18 @@ printf 'MYSQL_ROOT_PASSWORD=%s\nMYSQL_ROOT_HOST=%%\nMYSQL_DATABASE=delivery_upgr
 unset rehearsal_secret
 docker network create --internal "$rehearsal_network" >/dev/null
 docker run --detach --name "$rehearsal_container" --network "$rehearsal_network" --memory 1g --memory-swap 1g --tmpfs /var/lib/mysql:size=512m --env-file "$temporary_dir/mysql.env" "$mysql_image" --event-scheduler=OFF --local-infile=OFF --skip-log-bin >/dev/null
+# The official MySQL image briefly starts an initialization server with
+# --skip-networking, then stops it before launching the final server. Do not
+# treat that temporary socket as readiness for restoring the production dump.
+mysql_rehearsal_ready() {
+ docker exec "$rehearsal_container" sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; mysql --user=root --batch --skip-column-names -e "SELECT @@skip_networking" delivery_upgrade_test' 2>/dev/null | grep -Fxq '0'
+}
 ready=false
-for attempt in {1..60}; do
- if docker exec "$rehearsal_container" sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; mysql --user=root --batch --skip-column-names -e "SELECT 1" delivery_upgrade_test' >/dev/null 2>&1; then ready=true; break; fi
+for attempt in {1..90}; do
+ if mysql_rehearsal_ready; then
+  sleep 2
+  if mysql_rehearsal_ready; then ready=true; break; fi
+ fi
  sleep 2
 done
 [[ "$ready" == true ]] || { printf 'Cópia de ensaio não iniciou no prazo.\n'; exit 3; }
