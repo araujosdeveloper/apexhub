@@ -1,8 +1,9 @@
 'use strict';
 const $ = id => document.getElementById(id);
+const storeUrl = slug => ['apexdelivery.com.br','www.apexdelivery.com.br'].includes((typeof location.hostname==='string'?location.hostname.toLowerCase():'')) && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? `https://${slug}.apexdelivery.com.br/` : '/?loja='+encodeURIComponent(slug);
 const kitchen = document.body.dataset.view === 'kitchen';
 const labels = { pending: 'Novos', preparing: 'Em preparo', ready: 'Prontos', delivering: 'Em entrega', completed: 'Concluídos', cancelled: 'Cancelados' };
-const actionLabels = { preparing: 'Aceitar e preparar', ready: 'Marcar pronto', delivering: 'Saiu para entrega', completed: 'Concluir pedido', cancelled: 'Cancelar' };
+const actionLabels = { preparing: 'Iniciar preparo', ready: 'Marcar como pronto', delivering: 'Saiu para entrega', completed: 'Concluir / Entregue', cancelled: 'Cancelar' };
 const state = { authenticated: false, initializing: false, started: false, orders: [], counts: {}, offset: 0, limit: 60, total: 0,
   revision: 0, loading: false, queued: false, stale: true, updating: new Set(), stream: null, streamLive: false,
   latestPending: null, soundEnabled: false, audio: null, clockOffset: 0, fingerprint: '', user: null };
@@ -19,7 +20,7 @@ function shownStatuses() {
 }
 function allowedActions(order) {
   if (!(order.items || []).length) return !kitchen && ['pending','preparing','ready','delivering'].includes(order.status) ? ['cancelled'] : [];
-  if (kitchen) return order.status === 'pending' ? ['preparing'] : order.status === 'preparing' ? ['ready'] : [];
+  if (kitchen) return order.status === 'pending' ? ['preparing'] : order.status === 'preparing' ? ['ready'] : order.status === 'ready' ? ['completed'] : [];
   return ({ pending: ['preparing','cancelled'], preparing: ['ready','cancelled'], ready: [order.fulfillment_method === 'pickup' ? 'completed' : 'delivering','cancelled'], delivering: ['completed','cancelled'] })[order.status] || [];
 }
 function addons(snapshot) {
@@ -29,7 +30,7 @@ function addons(snapshot) {
 function itemsHtml(order, prices = !kitchen) {
   const items = order.items || [];
   if (!items.length) return '<p class="notice error">Pedido antigo sem itens registrados. Confirme com o responsável antes de produzir.</p>';
-  return '<ul class="items">' + items.map(item => `<li><span class="quantity">${Number(item.quantity)}×</span> ${escapeHtml(item.product_name)}${prices ? ' <span class="muted">· ' + money(item.total_price ?? item.unit_price * item.quantity) + '</span>' : ''}${addons(item.addons_snapshot).length ? '<ul class="addon-list">' + addons(item.addons_snapshot).map(option => `<li>+ ${escapeHtml(option.group_name)}: ${escapeHtml(option.name)}${prices && Number(option.price) ? ' · ' + money(option.price) + ' por unidade' : ''}</li>`).join('') + '</ul>' : ''}</li>`).join('') + '</ul>';
+  return '<ul class="items">' + items.map(item => `<li><span class="quantity">${Number(item.quantity)}×</span> ${escapeHtml(item.product_name)}${prices ? ' <span class="muted">· ' + money(item.total_price ?? item.unit_price * item.quantity) + '</span>' : ''}${item.item_notes ? '<p class="item-note">Observação: ' + escapeHtml(item.item_notes) + '</p>' : ''}${addons(item.addons_snapshot).length ? '<ul class="addon-list">' + addons(item.addons_snapshot).map(option => `<li>+ ${escapeHtml(option.group_name)}: ${(option.quantity || 1) > 1 ? Number(option.quantity) + '× ' : ''}${escapeHtml(option.name)}${prices && Number(option.price) ? ' · ' + money(option.price) + ' por adicional' : ''}</li>`).join('') + '</ul>' : ''}</li>`).join('') + '</ul>';
 }
 function timing(order, now = Date.now() + state.clockOffset) {
   const received = Date.parse(order.created_at);
@@ -195,7 +196,7 @@ async function initialize() {
     if (response.status === 401) { expired(); return; }
     if (!response.ok) throw new Error('Não foi possível validar a sessão. Clique em Atualizar.');
     const { user } = await response.json(); state.user = user; state.authenticated = true;
-    $('company-name').textContent = user.company_name; $('store-link').href = '/?loja=' + encodeURIComponent(user.slug);
+    $('company-name').textContent = user.company_name; $('store-link').href = storeUrl(user.slug);
     document.querySelectorAll('.manage-only').forEach(node => { node.hidden = !['owner','manager'].includes(user.role); });
     document.querySelectorAll('.owner-only').forEach(node => { node.hidden = user.role !== 'owner'; });
     const initialQuery=new URLSearchParams(location.search);

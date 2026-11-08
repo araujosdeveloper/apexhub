@@ -62,7 +62,13 @@ cleanup() {
    fi
   fi
  elif [[ "$completed" != true ]]; then printf 'FALHOU_ANTES_DA_MANUTENCAO\n' > "$update_dir/STATUS.txt"; fi
- if docker container inspect "$rehearsal_container" >/dev/null 2>&1; then docker rm -f "$rehearsal_container" >/dev/null || result=4; fi
+ if docker container inspect "$rehearsal_container" >/dev/null 2>&1; then
+  if [[ "$completed" != true ]]; then
+   docker inspect --format '{{json .State}}' "$rehearsal_container" > "$update_dir/rehearsal-mysql-state.json" 2>&1
+   docker logs --tail 250 "$rehearsal_container" > "$update_dir/rehearsal-mysql.log" 2>&1
+  fi
+  docker rm -f "$rehearsal_container" >/dev/null || result=4
+ fi
  if docker network inspect "$rehearsal_network" >/dev/null 2>&1; then docker network rm "$rehearsal_network" >/dev/null || result=4; fi
  if [[ -n "$temporary_dir" ]]; then rm -f -- "$temporary_dir/mysql.env"; rmdir -- "$temporary_dir" || result=4; fi
  if (( result )); then printf 'ATUALIZAÇÃO NÃO CONFIRMADA (código %s). Relatório: %s\n' "$result" "$update_dir"; fi
@@ -104,13 +110,27 @@ printf 'MYSQL_ROOT_PASSWORD=%s\nMYSQL_ROOT_HOST=%%\nMYSQL_DATABASE=delivery_upgr
 unset rehearsal_secret
 docker network create --internal "$rehearsal_network" >/dev/null
 docker run --detach --name "$rehearsal_container" --network "$rehearsal_network" --memory 1g --memory-swap 1g --tmpfs /var/lib/mysql:size=512m --env-file "$temporary_dir/mysql.env" "$mysql_image" --event-scheduler=OFF --local-infile=OFF --skip-log-bin >/dev/null
+# The official MySQL image briefly starts an initialization server with
+# --skip-networking, then stops it before launching the final server. Do not
+# treat that temporary socket as readiness for restoring the production dump.
+mysql_rehearsal_ready() {
+ docker exec "$rehearsal_container" sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; mysql --user=root --batch --skip-column-names -e "SELECT @@skip_networking" delivery_upgrade_test' 2>/dev/null | grep -Fxq '0'
+}
 ready=false
-for attempt in {1..60}; do
- if docker exec "$rehearsal_container" sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; mysql --user=root --batch --skip-column-names -e "SELECT 1" delivery_upgrade_test' >/dev/null 2>&1; then ready=true; break; fi
+for attempt in {1..90}; do
+ if mysql_rehearsal_ready; then
+  sleep 2
+  if mysql_rehearsal_ready; then ready=true; break; fi
+ fi
  sleep 2
 done
 [[ "$ready" == true ]] || { printf 'Cópia de ensaio não iniciou no prazo.\n'; exit 3; }
-gzip -dc "$source_backup/backup.sql.gz" | docker exec -i "$rehearsal_container" sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql --user=root --default-character-set=utf8mb4 --binary-mode=1 delivery_upgrade_test'
+printf 'MySQL temporário pronto. Restaurando o backup na cópia descartável...\n'
+if ! gzip -dc "$source_backup/backup.sql.gz" | docker exec -i "$rehearsal_container" sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql --user=root --default-character-set=utf8mb4 --binary-mode=1 delivery_upgrade_test'; then
+ printf 'Falha ao restaurar backup na cópia descartável; a aplicação publicada e o banco real não foram alterados.\n' >&2
+ exit 3
+fi
+printf 'Restauração da cópia descartável concluída. Executando migrações e smoke...\n'
 docker run --rm --user 0:0 --read-only --tmpfs /tmp --network "$rehearsal_network" --env-file "$temporary_dir/mysql.env" -v "$update_dir:/output" "$candidate_image" node scripts/upgrade-live.js --rehearse
 docker rm -f "$rehearsal_container" >/dev/null
 docker network rm "$rehearsal_network" >/dev/null
@@ -193,8 +213,11 @@ public_get /tenant/dashboard >/dev/null
 public_get /assisted-context.js >/dev/null
 public_get /impersonation-entry.js >/dev/null
 public_get /apex-tokens.css >/dev/null
+public_get /landing.html >/dev/null
+public_get /landing.css >/dev/null
+public_get /favicon.svg >/dev/null
 printf 'PUBLICADO\n' > "$update_dir/STATUS.txt"
 printf '%s\n' "$update_dir" > deploy/latest-update.path
 completed=true
-printf '\nATUALIZAÇÃO PUBLICADA: enquadramento da capa e sobreposição da logo ApexHub.\n'
+printf '\nATUALIZAÇÃO PUBLICADA: landing comercial e roteamento de hosts Apex Delivery.\n'
 printf 'Painel: https://179.198.120.188/login.html\nMaster: https://179.198.120.188/master-login.html\nBackup final: %s\nRelatório: %s\n' "$final_backup" "$update_dir"

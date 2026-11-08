@@ -1,4 +1,4 @@
-# API Super Admin ApexHub
+# API Super Admin Apex Delivery
 
 API Super Admin publicada em 05/11/2026 às 20:25 UTC. STATUS=PUBLICADO e ponteiro latest-update confirmados em `reports/update-20261105T202338Z-384376`; backup final `backups/live/live-20261105T202528Z-389880`. Integração MySQL real aprovada em `reports/mysql-validation-20261105T202420Z-386763.log`: cadastro transacional, paginação, status, revogação, métricas e restrição de perfil. Ensaio da cópia, dados anteriores preservados, canário e verificações HTTP aprovados. Nenhuma migração SQL aplicada. Esta entrega é de backend; o painel mantém a interface existente. As credenciais Master existentes não são recriadas pelo atualizador.
 
@@ -61,7 +61,7 @@ Exemplo ilustrativo, com dados e senha fornecidos pelo administrador:
   "name": "Loja Exemplo",
   "slug": "loja-exemplo",
   "cnpj": "12.ABC.345/01DE-00",
-  "plan_code": "starter",
+  "plan_code": "trial",
   "owner": {
     "name": "Nome do Proprietário",
     "email": "proprietario@example.com",
@@ -74,9 +74,13 @@ Nome da loja até 160 caracteres; responsável até 120; e-mail até 254; senha 
 
 CNPJ é obrigatório, normalizado para maiúsculas e sem máscara; aceita 12 posições alfanuméricas e dois dígitos finais numéricos. A validação é de formato, sem cálculo de DV ou consulta cadastral à Receita. O exemplo é sintético. Cadastros anteriores e o editor antigo mantêm seu contrato de identificador fiscal já existente.
 
-`plan_code` usa até 40 caracteres (letras minúsculas, números, hífen/underscore, iniciando com letra; mínimo 2); padrão `starter`. O código identifica o plano no cadastro e não processa cobrança nem cria um preço. A assinatura inicial é `trialing`, com 14 dias, como no cadastro existente da plataforma. Não são atribuídas permissões Master ao proprietário: o papel gravado é sempre `owner`.
+Toda nova empresa criada pelo Master também recebe automaticamente `plan_code=trial`, status `trialing` e validade de 30 dias. Valores legados do campo `plan_code` são aceitos na API por compatibilidade; não são ativados como plano pago. Não são atribuídas permissões Master ao proprietário: o papel gravado é sempre `owner`.
 
 Empresa, proprietário, assinatura, perfil fiscal e auditoria `tenant_created` são criados numa única transação. E-mail do proprietário é único na tabela users; slug e CNPJ também são únicos. Qualquer falha reverte tudo. O Master e sua sessão são revalidados com travas antes de escrever. Senha é armazenada com scrypt e não retornada, registrada em auditoria ou escrita em logs. A operação não autentica o administrador como lojista e não envia mensagens ao responsável.
+
+## Solicitações e ativação de plano
+
+`GET /api/admin/subscription-requests` lista solicitações pendentes Essencial/Pro. `PUT /api/admin/subscription-requests/:id` recebe `{"status":"accepted"}` ou `{"status":"declined"}`. Apenas Super Admin autenticado pode consultar ou processar; aceitação ativa o plano solicitado, encerra o trial e grava auditoria. Recusa só encerra a solicitação. Nenhum endpoint cobra automaticamente.
 
 ## PUT /api/admin/tenants/:id/status
 
@@ -101,7 +105,7 @@ Valores monetários são strings decimais em BRL. Preços são convertidos para 
 Configuração opcional: `PLAN_PRICES_JSON` no ambiente do processo ou em `.env.plans` da raiz, carregado pelo Compose do app. Exemplo apenas de formato, ajustar aos contratos reais:
 
 ```dotenv
-PLAN_PRICES_JSON={"starter":"99.90","pro":"149.90"}
+PLAN_PRICES_JSON={"essencial":"99.90","pro":"149.90"}
 ```
 
 Aceita até 100 planos, valores não negativos com duas casas decimais e até seis dígitos inteiros. Configuração inválida impede inicialização; ausência não impede uso da API e é explicitada nas métricas. O atualizador não cria preços nem configura cobrança. Recriar/publicar app após alterar a configuração. `.env.plans` fica fora do GitHub e da imagem Docker.

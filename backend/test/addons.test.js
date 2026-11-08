@@ -22,6 +22,16 @@ test('variações diferentes permanecem separadas; seleções equivalentes são 
  assert.equal(normalized.lines.find(line => line.option_ids.includes('cheese')).quantity, 3);
  assert.throws(() => normalizeLines([item(['mayo'], 50), item(['ketchup'], 50)]), /99 unidades/);
 });
+test('observações individuais são normalizadas e mantêm linhas separadas no pedido', () => {
+ const normalized = normalizeLines([
+  { ...item(['cheese']), notes: '  Sem cebola  ' },
+  { ...item(['cheese']), notes: 'Com bastante molho' },
+  { ...item(['cheese']), notes: 'Sem cebola' }
+ ]);
+ assert.equal(normalized.lines.length, 2);
+ assert.deepEqual(normalized.lines.map(line => [line.notes, line.quantity]), [['Com bastante molho', 1], ['Sem cebola', 2]]);
+ assert.throws(() => normalizeLines([{ ...item([]), notes: 'x'.repeat(501) }]), /500 caracteres/);
+});
 test('opções duplicadas, identificadores inválidos e versões inválidas são rejeitados', () => {
  for (const change of [{ option_ids: ['ketchup', 'ketchup'] }, { option_ids: ['<script>'] }, { option_ids: 'ketchup' }, { addon_version: -1 }, { addon_version: '2' }]) {
   assert.throws(() => normalizeLines([{ ...item(['ketchup']), ...change }]), /inválida/);
@@ -54,6 +64,7 @@ test('hash identifica variações e versões; pedidos antigos sem adicionais man
  assert.equal(hash([item(['cheese', 'ketchup']), item(['mayo'])]), hash([item(['mayo']), item(['ketchup', 'cheese'])]));
  assert.notEqual(hash([item(['ketchup'])]), hash([item(['mayo'])]));
  assert.notEqual(hash([item(['ketchup'])]), hash([{ ...item(['ketchup']), addon_version: 3 }]));
+ assert.notEqual(hash([{ ...item([]), notes: 'Sem cebola' }]), hash([{ ...item([]), notes: 'Com cebola' }]));
  assert.equal(hash([{ product_id: 1, quantity: 2 }]), checkoutHash(7, customer, 'Pix', new Map([[1, 2]])));
 });
 function dbFor(role = 'owner', found = true, revision = 0) {
@@ -87,4 +98,76 @@ test('operador, produto de outra loja e edição desatualizada não alteram adic
   assert.equal(response.status, expected); assert.equal(state.writes.length, 0); assert.equal(state.committed, false);
   if (role !== 'operator') { assert.equal(state.rollback, true); assert.equal(state.released, true); }
  }
+});
+
+test('observações separam preparos e conservam o contrato de itens antigos', () => {
+ const { lines, quantities } = normalizeLines([
+  { product_id: 1, quantity: 1, notes: ' Sem milho ' },
+  { product_id: 1, quantity: 1, notes: 'Com milho' },
+  { product_id: 1, quantity: 2, notes: 'Sem milho' }
+ ]);
+ assert.equal(lines.length, 2);
+ assert.equal(quantities.get(1), 4);
+ assert.equal(lines.find(line => line.notes === 'Sem milho').quantity, 3);
+ assert.deepEqual(normalizeLines([{ product_id: 1, quantity: 1 }]).lines,
+  [{ product_id: 1, option_ids: [], addon_version: 0, quantity: 1 }]);
+ for (const notes of [null, 12, {}, 'x'.repeat(501), 'sem\u0000milho']) {
+  assert.throws(() => normalizeLines([{ product_id: 1, quantity: 1, notes }]), /Observação/);
+ }
+});
+test('hash preserva reenvio antigo e detecta alteração da observação', () => {
+ const customer = { name: 'Ana', phone: '11999999999', street: 'Rua', number: '1', neighborhood: 'Centro' };
+ const hash = items => { const normalized = normalizeLines(items); return checkoutHash(1, customer, 'Pix', normalized.quantities, 'delivery', undefined, normalized.lines); };
+ assert.equal(hash([{ product_id: 1, quantity: 1 }]), hash([{ product_id: 1, quantity: 1, notes: ' ' }]));
+ assert.notEqual(hash([{ product_id: 1, quantity: 1, notes: 'Sem milho' }]), hash([{ product_id: 1, quantity: 1, notes: 'Com milho' }]));
+ assert.notEqual(hash([{ product_id: 1, quantity: 1, notes: 'Sem milho' }, { product_id: 1, quantity: 1 }]), hash([{ product_id: 1, quantity: 2, notes: 'Sem milho' }]));
+});
+
+const quantityGroups = [{ id: 'extras', name: 'Extras', min: 1, max: 4, options: [
+ { id: 'cheese', name: 'Queijo', price: '2.50', active: true, max_quantity: 3 },
+ { id: 'bacon', name: 'Bacon', price: '3.00', active: true }
+] }];
+const quantityProduct = { id: 1, name: 'Lanche', price: '12.35', addon_version: 4, addon_config: quantityGroups };
+function quantityLine(counts, extra = {}) { return normalizeLines([{ product_id: 1, quantity: 2, addon_version: 4, option_quantities: counts, ...extra }]).lines[0]; }
+test('quantidade adicional cobra duas vezes por produto e preserva snapshot', () => {
+ const priced = priceLine(quantityProduct, quantityLine({ cheese: 2, bacon: 1 }));
+ assert.equal(priced.unitCents, 2035);
+ assert.equal(priced.unitCents * priced.quantity, 4070);
+ assert.equal(priced.snapshot.find(option => option.option_id === 'cheese').quantity, 2);
+ assert.equal(priced.snapshot.find(option => option.option_id === 'bacon').quantity, undefined);
+ const copy = structuredClone(quantityProduct);copy.addon_config[0].options[0].price = '9.00';
+ assert.equal(priced.snapshot.find(option => option.option_id === 'cheese').price, '2.50');
+});
+test('quantidade adicional valida limites, grupos, disponibilidade e escopo do produto', () => {
+ for (const counts of [{cheese:4},{cheese:0},{cheese:-1},{cheese:1.5},{cheese:'2'},{cheese:21},{cheese:2,foreign:1}]) {
+  assert.throws(() => priceLine(quantityProduct, quantityLine(counts)));
+ }
+ assert.throws(() => quantityLine({ cheese: 2 }, { option_ids: [] }));
+ for (const counts of [null, [], '2']) assert.throws(() => quantityLine(counts));
+ const small = structuredClone(quantityProduct);small.addon_config[0].max = 2;
+ assert.throws(() => priceLine(small, quantityLine({cheese:2,bacon:1})), /Escolha/);
+ const paused = structuredClone(quantityProduct);paused.addon_config[0].options[0].active = false;
+ assert.throws(() => priceLine(paused, quantityLine({cheese:2})), /indisponível/);
+ const old = {...quantityProduct, addon_config: [{...quantityGroups[0],max:2,options:quantityGroups[0].options.map(({max_quantity,...o})=>o)}]};
+ assert.throws(() => priceLine(old, quantityLine({cheese:2})), /limite/);
+});
+test('seleções antigas e quantidades explícitas iguais a um têm o mesmo hash', () => {
+ const customer={name:'Ana',phone:'11999999999',street:'Rua',number:'1',neighborhood:'Centro'};
+ const hash=items=>{const n=normalizeLines(items);return checkoutHash(1,customer,'Pix',n.quantities,'delivery',undefined,n.lines);};
+ const old={product_id:1,quantity:1,option_ids:['cheese','bacon'],addon_version:4};
+ assert.equal(hash([old]),hash([{...old,option_quantities:{bacon:1,cheese:1}}]));
+ assert.notEqual(hash([old]),hash([{...old,option_quantities:{cheese:2}}]));
+ const variants=normalizeLines([{...old,option_quantities:{cheese:2}},old,{...old,option_quantities:{bacon:1,cheese:2}}]);
+ assert.equal(variants.lines.length,2);
+ assert.equal(variants.lines.find(line=>line.option_quantities).quantity,2);
+});
+test('configuração valida capacidade em unidades e mantém limite antigo padrão um', () => {
+ assert.equal(validateGroups(quantityGroups)[0].options[0].max_quantity,3);
+ assert.equal(validateGroups(quantityGroups)[0].options[1].max_quantity,undefined);
+ for (const maximum of [null,0,-1,1.5,'3',21]) {
+  const copy=structuredClone(quantityGroups);copy[0].options[0].max_quantity=maximum;
+  assert.throws(()=>validateGroups(copy));
+ }
+ const impossible=structuredClone(quantityGroups);impossible[0].max=5;
+ assert.throws(()=>validateGroups(impossible));
 });

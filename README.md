@@ -1,6 +1,6 @@
-# Delivery SaaS
+# Apex Delivery
 
-Plataforma de restaurantes por assinatura. A primeira entrega implementa cadastro, autenticação, separação entre restaurantes, gestão inicial de cardápio e pedidos. O plano técnico está em [docs/arquitetura.md](docs/arquitetura.md).
+Plataforma SaaS de delivery para restaurantes, com gestão de cardápio, pedidos, clientes, operação e painel Master. O plano técnico está em [docs/arquitetura.md](docs/arquitetura.md).
 
 Escopo de evolução com referência funcional na Brendi, situação atual e critérios de entrega: [docs/escopo-produto.md](docs/escopo-produto.md).
 
@@ -13,6 +13,20 @@ Adicionais por produto também publicados: grupos, limites de escolha, preços e
 [Cupons e promoções](docs/cupons.md) publicados em 04/11/2026 às 03:19 UTC, com valores fixos, percentuais, frete grátis, validade e limites. Migração 006 aplicada com dados anteriores preservados; 124 testes e integração MySQL aprovados. Conferência visual desta entrega ainda pendente. Automação de atendimento/WhatsApp/IA fica para a última etapa, por decisão do responsável.
 
 Para futuras atualizações do ambiente já ativo, executar no host `bash /root/delivery-saas/scripts/update-live.sh`. O procedimento testa a imagem, ensaia as migrações numa cópia atual, cria backup final e atualiza a aplicação. Detalhes e recuperação em [docs/atualizacao-producao.md](docs/atualizacao-producao.md). Não usar novamente o corte inicial.
+
+## Assinaturas e período de teste
+
+Novos cadastros recebem `subscriptions.plan_code = 'trial'` com estado `trialing` e término em 30 dias, calculado em UTC. `subscriptions` é a fonte de verdade da assinatura; `companies` continua sendo a entidade da loja, sem uma tabela `tenants` duplicada. O plano `essencial` inclui pedidos e KDS; o `pro` inclui também importação de cardápio por IA, cupons e automações. O trial libera todos esses recursos. Ao expirar, o painel encaminha o lojista para `/plans.html`.
+
+O middleware de assinatura também valida IA e cupons no backend, incluindo cotação pública de cupom e checkout, para que a interface não seja a única barreira. Lojistas podem registrar uma solicitação Essencial/Pro; a solicitação não ativa cobrança nem libera recursos até a ativação pela equipe. A migração 018 cria `subscription_plan_requests`; banco novo já recebe a tabela por `database/001-initial.sql`. Cobrança recorrente ainda não está integrada.
+
+## Domínio oficial e lojas por subdomínio
+
+As três entradas públicas estão separadas por host: `https://apexdelivery.com.br` e `www` exibem a landing comercial; `https://admin.apexdelivery.com.br` abre o login Master e `/master` abre o painel; `https://<slug>.apexdelivery.com.br` abre o cardápio de uma loja ativa e `/painel` abre o login do lojista. O cadastro de novas lojas começa pelo site comercial. Links legados `/?loja=<slug>` continuam sendo atendidos.
+
+Configure `PUBLIC_BASE_DOMAIN=apexdelivery.com.br` no ambiente da aplicação (exemplo em `backend/.env.example`). O Caddy autoriza TLS sob demanda para o domínio base, `www`, `admin` e subdomínios que correspondam a lojas ativas. O backend encaminha cada host para sua página própria; no subdomínio, o slug do host prevalece sobre query strings e as sessões tenant só autenticam usuários da mesma loja. Os endpoints do Master continuam exigindo perfil `super_admin` e sessão Master válida.
+
+No DNS, aponte o registro A do domínio raiz e `*.apexdelivery.com.br` para o IP público da VPS; configure também AAAA somente se a VPS aceitar IPv6 nas portas 80 e 443. O primeiro certificado de cada host é emitido quando recebe tráfego HTTPS. A troca de domínio não configura DNS no provedor nem altera os registros atuais da VPS.
 
 ## Desenvolvimento em banco novo
 
@@ -183,13 +197,13 @@ Publicado em 04/11/2026: [acompanhamento do pedido pelo cliente](docs/acompanham
 
 Publicado em 04/11/2026: [avaliações de satisfação](docs/avaliacoes.md), com nota/comentário pelo acompanhamento após conclusão e painel da loja. Publicação, migração 011 e integração MySQL real confirmadas pelo atualizador habitual.
 
-Dashboard ApexHub publicado em 04/11/2026: [design, arquivos e critérios dos indicadores](docs/dashboard-apexhub.md). Paleta escura/laranja, KPIs reais, gráficos, busca, últimos pedidos e KDS. Sem nova migração; login de dono/gerente abre `/dashboard.html`.
+Dashboard Apex Delivery publicado em 04/11/2026: [design, arquivos e critérios dos indicadores](docs/dashboard-apexhub.md). Paleta escura/laranja, KPIs reais, gráficos, busca, últimos pedidos e KDS. Sem nova migração; login de dono/gerente abre `/dashboard.html`.
 
-Layout global ApexHub publicado em 05/11/2026: [App Shell persistente e tema compartilhado em todas as telas internas](docs/layout-global-apexhub.md). Sidebar/header mantidos na navegação, Pedidos em Lista/Quadro e Financeiro com resumo dos relatórios existentes. Sem migração.
+Layout global Apex Delivery publicado em 05/11/2026: [App Shell persistente e tema compartilhado em todas as telas internas](docs/layout-global-apexhub.md). Sidebar/header mantidos na navegação, Pedidos em Lista/Quadro e Financeiro com resumo dos relatórios existentes. Sem migração.
 
-[Master ApexHub](docs/master-apexhub.md) implementado e preparado para publicação: painel exclusivo para administradores da plataforma, métricas globais reais, busca/edição/suspensão de empresas e auditoria. Migração 012 aditiva; primeira conta criada por `scripts/create-master.sh` após a atualização. 246 testes locais aprovados. Publicação, MySQL real e conferência visual pendentes; gateway, Docker e acesso assistido aparecem como integrações pendentes.
+[Master Apex Delivery](docs/master-apexhub.md) implementado e preparado para publicação: painel exclusivo para administradores da plataforma, métricas globais reais, busca/edição/suspensão de empresas e auditoria. Migração 012 aditiva; primeira conta criada por `scripts/create-master.sh` após a atualização. 246 testes locais aprovados. Publicação, MySQL real e conferência visual pendentes; gateway, Docker e acesso assistido aparecem como integrações pendentes.
 
-Master ApexHub publicado em 05/11/2026 às 18:06 UTC. STATUS=PUBLICADO e ponteiro latest-update confirmados em `reports/update-20261105T180428Z-216080`; backup final `backups/live/live-20261105T180606Z-221182`. Integração MySQL real aprovada em `reports/mysql-validation-20261105T180459Z-218120.log`. Migração 012, ensaio da cópia, preservação dos dados anteriores, canário e verificações HTTP aprovados. Criação da conta Master e conferência visual pelo responsável ainda não confirmadas.
+Master Apex Delivery publicado em 05/11/2026 às 18:06 UTC. STATUS=PUBLICADO e ponteiro latest-update confirmados em `reports/update-20261105T180428Z-216080`; backup final `backups/live/live-20261105T180606Z-221182`. Integração MySQL real aprovada em `reports/mysql-validation-20261105T180459Z-218120.log`. Migração 012, ensaio da cópia, preservação dos dados anteriores, canário e verificações HTTP aprovados. Criação da conta Master e conferência visual pelo responsável ainda não confirmadas.
 
 [JWT, RBAC e isolamento multi-tenant](docs/autenticacao-rbac.md) implementados e preparados para atualização: middlewares centrais, `super_admin`/`tenant_owner`/`tenant_manager`/`tenant_operator`, `req.tenantId` imutável e tokens de 15 minutos vinculados às sessões revogáveis. Coluna `company_id` preservada; sem nova migração. O atualizador configura chaves privadas persistentes automaticamente. Publicação e MySQL real desta entrega ainda pendentes.
 

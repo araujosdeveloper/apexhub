@@ -1,6 +1,7 @@
 'use strict';
 /* App Shell persistente. Cada view conserva seu contexto, formulários e ciclo de vida. */
 const $=id=>document.getElementById(id);
+const storeUrl=slug=>['apexdelivery.com.br','www.apexdelivery.com.br'].includes((typeof location.hostname==='string'?location.hostname.toLowerCase():''))&&/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)?`https://${slug}.apexdelivery.com.br/`:'/?loja='+encodeURIComponent(slug);
 const routes={
  '/dashboard.html':{title:'Visão Geral',label:'Dashboard',icon:'grid',manage:true},
  '/admin.html':{title:'Gestão de Pedidos',label:'Gestão de Pedidos',icon:'orders'},
@@ -26,7 +27,7 @@ function fail(message){$('shell-feedback').textContent=message;$('shell-feedback
 function expire(){const assisted=Boolean(state.assisted)||Boolean(window.ApexAssisted?.context);state.stream?.close();state.user=null;$('page-view').hidden=true;if(assisted)window.ApexAssisted?.clear();location.replace(assisted?'/master.html':'/login.html');}
 async function api(url,options={}){
  const response=await fetch(url,{cache:'no-store',...options});if(response.status===401){expire();throw new Error('Entre novamente.');}
- const data=await response.json();if(!response.ok)throw new Error(data.error||'Não foi possível consultar.');
+ const data=await response.json();if(response.status===402&&data.redirect_url){location.replace(data.redirect_url);throw new Error(data.error||'Escolha um plano.');}if(!response.ok)throw new Error(data.error||'Não foi possível consultar.');
  if(data.company_id!==undefined&&Number(data.company_id)!==Number(state.user?.company_id)){expire();throw new Error('A loja da sessão mudou.');}return data;
 }
 function renderNavigation(){
@@ -61,7 +62,7 @@ function navigate(value,{replace=false,history=true}={}){
  const relative=url.pathname+url.search+url.hash;
  if(state.current&&state.current.pathname+state.current.search+state.current.hash===relative&&!replace){closeSidebar();return true;}
  state.current=url;++state.routeRevision;fail('');closeMenus();
- $('shell-title').textContent=routes[url.pathname].title;document.title=routes[url.pathname].title+' · ApexHub';
+ $('shell-title').textContent=routes[url.pathname].title;document.title=routes[url.pathname].title+' · Apex Delivery';
  $('page-view').title=routes[url.pathname].title;$('page-view').hidden=true;$('view-loading').hidden=false;$('view-loading').textContent='Carregando '+routes[url.pathname].title+'…';
  if(history)window.history[replace?'replaceState':'pushState']({},'',relative);
  markActive();
@@ -82,7 +83,7 @@ $('page-view').addEventListener('load',()=>{
   if(!allowed(routes[url.pathname])){navigate('/admin.html',{replace:true});return;}
   if(child.document.body?.classList.contains('apex-shell')){child.location.replace(embeddedUrl(url));return;}
   const clean=normalize(url.href);
-  if(clean&&clean.pathname+clean.search!==state.current.pathname+state.current.search){state.current=clean;window.history.replaceState({},'',clean.pathname+clean.search+clean.hash);$('shell-title').textContent=routes[clean.pathname].title;document.title=routes[clean.pathname].title+' · ApexHub';markActive();}
+  if(clean&&clean.pathname+clean.search!==state.current.pathname+state.current.search){state.current=clean;window.history.replaceState({},'',clean.pathname+clean.search+clean.hash);$('shell-title').textContent=routes[clean.pathname].title;document.title=routes[clean.pathname].title+' · Apex Delivery';markActive();}
   $('view-loading').hidden=true;$('page-view').hidden=false;
  }catch{fail('Não foi possível abrir o conteúdo. Atualize a página.');$('view-loading').hidden=true;}
 });
@@ -123,6 +124,6 @@ async function refreshNotifications(){if(!state.user||state.loading)return;state
 function connect(){if(!state.user||state.stream||document.hidden||typeof EventSource!=='function')return;const stream=new EventSource('/api/admin/orders/events');state.stream=stream;stream.addEventListener('orders-changed',refreshNotifications);stream.addEventListener('session-ended',expire);}
 $('assisted-exit').onclick=async()=>{const button=$('assisted-exit');button.disabled=true;try{await window.ApexAssisted.end();}catch(error){fail(error.message);button.disabled=false;}};
 $('logout').onclick=async()=>{if(state.assisted){$('assisted-exit').onclick();return;}try{const response=await fetch('/api/auth/logout',{method:'POST'});if(response.ok||response.status===401)expire();else fail('Não foi possível sair. Tente novamente.');}catch{fail('Não foi possível sair. Tente novamente.');}};
-async function initialize(){try{const {user,impersonation}=await api('/api/auth/me');state.user=user;state.assisted=impersonation||null;if(impersonation){document.body.classList.add('assisted-mode');$('assisted-banner').hidden=false;$('assisted-description').textContent=user.company_name+' · '+impersonation.actor.name+' · até '+new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date(impersonation.expires_at));const remaining=Date.parse(impersonation.expires_at)-Date.now();if(remaining<=0){expire();return;}setTimeout(expire,remaining);}$('user-name').textContent=state.assisted?state.assisted.actor.name:user.name;$('user-role').textContent=state.assisted?'Master · acesso assistido':roleNames[user.role]||user.role;$('user-email').textContent=state.assisted?state.assisted.actor.email:user.email;$('avatar').textContent=(state.assisted?state.assisted.actor.name:user.name).trim().split(/\s+/).slice(0,2).map(word=>word[0]).join('').toUpperCase();$('sidebar-store').textContent=user.company_name;$('shell-store-link').href='/?loja='+encodeURIComponent(user.slug);const option=document.createElement('option');option.value=user.company_id;option.textContent=user.company_name;$('store-select').replaceChildren(option);$('team-link').hidden=user.role!=='owner';if(user.role==='operator')$('profile-menu').querySelector('a[href="/operations.html"]').hidden=true;renderNavigation();navigate(normalize(location.href)?location.href:(user.role==='operator'?'/admin.html':'/dashboard.html'),{replace:true});refreshNotifications();connect();setInterval(()=>{if(!document.hidden)refreshNotifications();},30000);}catch(e){fail(e.message);$('view-loading').textContent='Não foi possível abrir o painel. Atualize para tentar novamente.';}}
+async function initialize(){try{const {user,impersonation}=await api('/api/auth/me');state.user=user;state.assisted=impersonation||null;if(impersonation){document.body.classList.add('assisted-mode');$('assisted-banner').hidden=false;$('assisted-description').textContent=user.company_name+' · '+impersonation.actor.name+' · até '+new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date(impersonation.expires_at));const remaining=Date.parse(impersonation.expires_at)-Date.now();if(remaining<=0){expire();return;}setTimeout(expire,remaining);}else{const {subscription}=await api('/api/tenant/subscription');if(['trial_expired','inactive'].includes(subscription.access_state)){location.replace('/plans.html');return;}}$('user-name').textContent=state.assisted?state.assisted.actor.name:user.name;$('user-role').textContent=state.assisted?'Master · acesso assistido':roleNames[user.role]||user.role;$('user-email').textContent=state.assisted?state.assisted.actor.email:user.email;$('avatar').textContent=(state.assisted?state.assisted.actor.name:user.name).trim().split(/\s+/).slice(0,2).map(word=>word[0]).join('').toUpperCase();$('sidebar-store').textContent=user.company_name;$('shell-store-link').href=storeUrl(user.slug);const option=document.createElement('option');option.value=user.company_id;option.textContent=user.company_name;$('store-select').replaceChildren(option);$('team-link').hidden=user.role!=='owner';if(user.role==='operator')$('profile-menu').querySelector('a[href="/operations.html"]').hidden=true;renderNavigation();navigate(normalize(location.href)?location.href:(user.role==='operator'?'/admin.html':'/dashboard.html'),{replace:true});refreshNotifications();connect();setInterval(()=>{if(!document.hidden)refreshNotifications();},30000);}catch(e){fail(e.message);$('view-loading').textContent='Não foi possível abrir o painel. Atualize para tentar novamente.';}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){state.stream?.close();state.stream=null;}else{refreshNotifications();connect();}});window.addEventListener('pagehide',()=>{state.stream?.close();state.stream=null;});window.addEventListener('pageshow',event=>{if(event.persisted){refreshNotifications();connect();}});
 initialize();

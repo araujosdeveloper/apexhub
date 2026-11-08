@@ -8,10 +8,10 @@ const {createTenantMenuController}=require('../controllers/tenant-menu');
 function tenantMenuRouter(db,auth,logger=console,importOptions={}){
  const importer=createMenuImportController(db,{...importOptions,logger}),gate=importOptions.gate||importGate();
  const jwtOnly=(req,res,next)=>req.auth?.credential==='bearer'?next():res.status(401).json({success:false,data:null,message:'Envie um JWT válido no cabeçalho Authorization: Bearer.'});
- const router=express.Router(),controller=createTenantMenuController(db,logger),manage=requireRoles('tenant_owner','tenant_manager');
+ const router=express.Router(),controller=createTenantMenuController(db,logger),manage=requireRoles('tenant_owner','tenant_manager'),aiAccess=importOptions.aiSubscriptionGate||((req,res,next)=>next());
  router.use(auth,manage);
- router.post('/import-ai',jwtOnly,gate,express.raw({type:()=>true,limit:MAX_UPLOAD}),asyncRoute(importer.preview));
- router.post('/confirm-import',jwtOnly,asyncRoute(importer.confirm));
+ router.post('/import-ai',aiAccess,jwtOnly,gate,express.raw({type:()=>true,limit:MAX_UPLOAD}),asyncRoute(importer.preview));
+ router.post('/confirm-import',aiAccess,jwtOnly,asyncRoute(importer.confirm));
  router.get('/',asyncRoute(controller.list));
  router.post('/categories',asyncRoute(controller.createCategory));
  router.post('/products',asyncRoute(controller.createProduct));

@@ -1,4 +1,4 @@
-# API de relatórios avançados ApexHub
+# API de relatórios avançados Apex Delivery
 
 Respostas: `{success:true,data:{...},message:"..."}`; erros seguros com request ID e logs estruturados. Todas as rotas exigem identidade ativa, incluindo validação de sessão e empresa. Não aceitam tenant escolhido no query/body. `company_id` é o nome físico de `tenant_id` no MySQL existente. Owners e managers podem ler relatórios; operadores não têm permissão financeira. Super Admin usa a rota global com sessão/JWT Master.
 

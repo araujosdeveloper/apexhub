@@ -11,13 +11,13 @@ function pagination(query){
 }
 function createInput(body){
  if(!body||Array.isArray(body)||typeof body!=='object')throw new AdminError(400,'Informe os dados da empresa e do proprietário.');
- const {name,owner,cnpj,plan_code='starter'}=body;
- if(typeof name!=='string'||!name.trim()||name.trim().length>160||!owner||Array.isArray(owner)||typeof owner.name!=='string'||!owner.name.trim()||owner.name.trim().length>120||typeof owner.email!=='string'||owner.email.trim().length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner.email.trim())||typeof owner.password!=='string'||owner.password.length<12||owner.password.length>128||!planCode(plan_code)||typeof cnpj!=='string')throw new AdminError(400,'Informe nome, proprietário com e-mail válido e senha de 12 a 128 caracteres, CNPJ e plan_code válido.');
+ const {name,owner,cnpj}=body;
+ if(typeof name!=='string'||!name.trim()||name.trim().length>160||!owner||Array.isArray(owner)||typeof owner.name!=='string'||!owner.name.trim()||owner.name.trim().length>120||typeof owner.email!=='string'||owner.email.trim().length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner.email.trim())||typeof owner.password!=='string'||owner.password.length<12||owner.password.length>128||typeof cnpj!=='string'||body.plan_code!==undefined&&!planCode(body.plan_code))throw new AdminError(400,'Informe nome, proprietário com e-mail válido e senha de 12 a 128 caracteres, CNPJ e plan_code válido quando informado.');
  const fiscal=cnpj.trim().toUpperCase().replace(/[.\/\s-]/g,'');
  if(!/^[A-Z0-9]{12}[0-9]{2}$/.test(fiscal))throw new AdminError(400,'CNPJ deve ter 14 posições, com os dois últimos dígitos numéricos.');
  let slug=body.slug;if(slug===undefined){const base=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60).replace(/-$/,'')||'loja';slug=base+'-'+randomBytes(4).toString('hex');}
  if(typeof slug!=='string'||slug.length<3||slug.length>80||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))throw new AdminError(400,'Slug inválido. Use de 3 a 80 letras minúsculas, números e hífens.');
- return {name:name.trim(),slug,cnpj:fiscal,plan_code,owner:{name:owner.name.trim(),email:owner.email.trim().toLowerCase(),password:owner.password}};
+ return {name:name.trim(),slug,cnpj:fiscal,plan_code:'trial',owner:{name:owner.name.trim(),email:owner.email.trim().toLowerCase(),password:owner.password}};
 }
 function tenantView(row){return {id:row.id,name:row.name,slug:row.slug,cnpj:row.cnpj||null,owner:row.owner_id?{id:row.owner_id,name:row.owner_name,email:row.owner_email}:null,plan:{code:row.plan_code||null,status:row.subscription_status||null,trial_ends_at:row.trial_ends_at?utcDate(row.trial_ends_at):null},status:Number(row.active)===1?'active':'suspended',created_at:utcDate(row.created_at)};}
 function createPlatformAdminController(db,{prices,logger=console}){
@@ -40,7 +40,7 @@ function createPlatformAdminController(db,{prices,logger=console}){
     await lockMaster(conn,req);
     const [company]=await conn.execute('INSERT INTO companies(name,slug,active) VALUES (?,?,1)',[input.name,input.slug]);
     const [owner]=await conn.execute("INSERT INTO users(company_id,name,email,password_hash,role,active) VALUES (?,?,?,?,'owner',1)",[company.insertId,input.owner.name,input.owner.email,encoded]);
-    await conn.execute("INSERT INTO subscriptions(company_id,plan_code,status,trial_ends_at) VALUES (?,?,'trialing',DATE_ADD(UTC_TIMESTAMP(),INTERVAL 14 DAY))",[company.insertId,input.plan_code]);
+    await conn.execute("INSERT INTO subscriptions(company_id,plan_code,status,trial_ends_at) VALUES (?,?,'trialing',DATE_ADD(UTC_TIMESTAMP(),INTERVAL 30 DAY))",[company.insertId,input.plan_code]);
     await conn.execute('INSERT INTO platform_tenant_profiles(company_id,cnpj) VALUES (?,?)',[company.insertId,input.cnpj]);
     await conn.execute("INSERT INTO platform_audit(admin_id,action,entity_id,details) VALUES (?,'tenant_created',?,?)",[req.master.id,String(company.insertId),JSON.stringify({name:input.name,owner_id:owner.insertId,plan_code:input.plan_code,subscription_status:'trialing'})]);
     const [[dates]]=await conn.execute('SELECT c.created_at,s.trial_ends_at FROM companies c JOIN subscriptions s ON s.company_id=c.id WHERE c.id=?',[company.insertId]);

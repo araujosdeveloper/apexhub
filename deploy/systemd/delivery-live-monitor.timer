@@ -1,5 +1,5 @@
 [Unit]
-Description=Monitoramento Delivery SaaS a cada cinco minutos
+Description=Monitoramento Apex Delivery a cada cinco minutos
 
 [Timer]
 OnBootSec=2min

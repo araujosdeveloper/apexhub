@@ -1,5 +1,5 @@
 [Unit]
-Description=Backup privado do banco real Delivery SaaS
+Description=Backup privado do banco real Apex Delivery
 Requires=docker.service
 After=docker.service
 

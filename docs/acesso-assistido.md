@@ -1,4 +1,4 @@
-# Acesso assistido e layout unificado ApexHub
+# Acesso assistido e layout unificado Apex Delivery
 
 Implementado em 05/11/2026, preparado para publicação. Acesso Master normal já foi confirmado pelo responsável. Esta entrega não redefine senhas nem encerra a sessão Master existente. Migração aditiva 013; publicação, execução MySQL real e conferência visual ainda pendentes.
 

@@ -1,10 +1,10 @@
-# Layout global ApexHub
+# Layout global Apex Delivery
 
 Publicado em 05/11/2026 às 03:30 UTC. STATUS=PUBLICADO confirmado em `reports/update-20261105T032936Z-3481760`; backup final `backups/live/live-20261105T033048Z-3486429`. Conferência visual pelo responsável ainda pendente. Unifica as 14 páginas internas, sem migração ou alteração de dados existentes.
 
 ## Shell persistente
 
-Sidebar fixa #121212 com marca ApexHub e navegação completa: Dashboard, Gestão de Pedidos / Ativos / Histórico, Cozinha (KDS), Cardápio, Clientes, Entregadores, Cupons, Relatórios, Financeiro, Configurações, Avaliações e Equipe. Permissões continuam sendo aplicadas: operador acessa operação; dados gerenciais exigem dono/gerente; equipe exige dono.
+Sidebar fixa #121212 com marca Apex Delivery e navegação completa: Dashboard, Gestão de Pedidos / Ativos / Histórico, Cozinha (KDS), Cardápio, Clientes, Entregadores, Cupons, Relatórios, Financeiro, Configurações, Avaliações e Equipe. Permissões continuam sendo aplicadas: operador acessa operação; dados gerenciais exigem dono/gerente; equipe exige dono.
 
 Header permanece no contêiner fixo com título/breadcrumb, busca, estabelecimento real da sessão, notificações de pedidos aguardando aceite e perfil/saída. O título permanece visível também em tablet/celular. Menu móvel usa drawer e backdrop. A seleção de estabelecimento não simula unidades adicionais ao suporte atual da plataforma.
 

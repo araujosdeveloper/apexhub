@@ -6,6 +6,7 @@ services:
     environment:
       PUBLIC_IP: ${PUBLIC_IP:?Informe o IP público}
       ACME_EMAIL: ${ACME_EMAIL:?Informe o e-mail de contato}
+      PUBLIC_BASE_DOMAIN: ${PUBLIC_BASE_DOMAIN:-apexdelivery.com.br}
     ports:
       - "80:80"
       - "443:443"
