@@ -175,7 +175,7 @@ function createApp(db, options = {}) {
     orderEvents.publish(req.tenantId);
     res.json({ success: true });
   }));
-  app.post('/api/orders', asyncRoute(async (req, res) => {
+  const placeOrder = async (req, res, expectedTotalCents) => {
     const body = req.body || {};
     const company_id = body.tenant_id ?? body.company_id;
     const hostSlug = tenantSlugFromHost(req);
@@ -242,6 +242,10 @@ function createApp(db, options = {}) {
       } catch (error) { if (error.code) throw error; await conn.rollback(); return res.status(400).json({ error: error.message }); }
       const { pricedLines } = priced;
       const discountCents = coupon?.discountCents || 0, totalCents = priced.grossCents - discountCents;
+      if (expectedTotalCents !== undefined && expectedTotalCents !== totalCents) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'O total mudou. Solicite um novo resumo antes de confirmar.' });
+      }
       await conn.execute(`INSERT INTO customers (company_id, name, phone, address_street, address_number, address_neighborhood) VALUES (?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE name = VALUES(name), address_street = IF(VALUES(address_street) = '', address_street, VALUES(address_street)), address_number = IF(VALUES(address_street) = '', address_number, VALUES(address_number)), address_neighborhood = IF(VALUES(address_street) = '', address_neighborhood, VALUES(address_neighborhood))`,
       [company_id, ...fields.map(f => customer[f].trim())]);
@@ -267,7 +271,17 @@ function createApp(db, options = {}) {
         estimated_minutes: fulfillment_method === 'pickup' ? operations.pickup_minutes : operations.delivery_minutes });
     } catch (err) { await conn.rollback(); throw err; }
     finally { conn.release(); }
-  }));
+  };
+  app.post('/api/orders', asyncRoute((req, res) => placeOrder(req, res)));
+  app.locals.placeWhatsAppOrder = async (body, requestKey, expectedTotalCents) => {
+    let status = 200;
+    return placeOrder({
+      body, get: name => name === 'Idempotency-Key' ? requestKey : undefined
+    }, {
+      status(code) { status = code; return this; },
+      json(data) { return { status, ...data }; }
+    }, expectedTotalCents);
+  };
   const frontendFile = name => path.join(__dirname, '../../frontend', name);
   app.get('/', asyncRoute(async (req, res, next) => {
     const host = String(req.hostname || '').toLowerCase();
