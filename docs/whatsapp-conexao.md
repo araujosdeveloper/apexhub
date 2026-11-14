@@ -38,3 +38,12 @@ número vinculado à loja. O Apex responde com o link do cardápio da loja.
 A aceitação da mensagem pela Meta é registrada separadamente do recebimento
 no aparelho. Em caso de resultado incerto, confira o aparelho antes de um
 novo teste. Para desligar o piloto, remova as duas variáveis e recrie a aplicação.
+
+No piloto do carrinho, envie `PRODUTOS` e `OPÇÕES 12` (trocando 12 pelo
+código exibido). Por exemplo, envie `ADICIONAR 12 1 | ovo:1 | sem batata palha`
+e depois `ADICIONAR 12 1 | salsicha:1 |`. Use os códigos reais dos adicionais.
+Consulte `CARRINHO`, depois envie `ENTREGA Nome | Rua | 10 | Bairro | Dinheiro`
+ou `RETIRADA Nome | Pix`. Confira o resumo antes de enviar `CONFIRMAR código`.
+O piloto registra pedidos reais no checkout. Use uma loja de teste para
+validar sem acionar a operação da Bebella. A migração 033 persiste carrinhos
+por empresa, número comercial e remetente.

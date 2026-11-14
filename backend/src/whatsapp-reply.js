@@ -1,6 +1,7 @@
 'use strict';
 
-const { createDecipheriv } = require('node:crypto');
+const { createDecipheriv, createHash } = require('node:crypto');
+const { handleCart } = require('./whatsapp-cart');
 const { configuredDomain, tenantSlugFromHost } = require('./public-hosts');
 const { loadSubscription, hasSubscriptionFeature, WHATSAPP_AUTOMATION } = require('./subscriptions');
 
@@ -12,7 +13,7 @@ function decryptToken(row, key) {
   return Buffer.concat([decipher.update(packed.subarray(28)), decipher.final()]).toString('utf8');
 }
 
-async function sendReply(row, token, version, link, fetchGraph) {
+async function sendReply(row, token, version, body, fetchGraph) {
   try {
     const response = await fetchGraph(
       'https://graph.facebook.com/' + version + '/' + row.phone_number_id + '/messages',
@@ -25,7 +26,7 @@ async function sendReply(row, token, version, link, fetchGraph) {
           messaging_product: 'whatsapp',
           to: row.sender,
           type: 'text',
-          text: { body: 'Olá! Veja o cardápio e faça seu pedido aqui: ' + link }
+          text: { body }
         })
       });
     if ([400, 401, 403, 404, 429].includes(response.status)) return ['rejected', null];
@@ -38,15 +39,16 @@ async function sendReply(row, token, version, link, fetchGraph) {
   }
 }
 
-async function processInitialReplies(db, { companyId, sender, key, version, fetchGraph = fetch }) {
+async function processInitialReplies(db, { companyId, sender, key, version, fetchGraph = fetch, placeOrder }) {
   const [rows] = await db.execute(
-    `SELECT i.id, i.company_id, i.phone_number_id, i.sender, w.waba_id, w.encrypted_token, c.slug
+    `SELECT i.id, i.company_id, i.phone_number_id, i.sender, i.body, w.waba_id, w.encrypted_token, c.slug
        FROM company_whatsapp_inbox i
        JOIN company_whatsapp_connections w ON w.company_id = i.company_id AND w.phone_number_id = i.phone_number_id
        JOIN companies c ON c.id = i.company_id AND c.active = 1
        LEFT JOIN whatsapp_initial_replies r ON r.inbox_id = i.id
        WHERE i.company_id = ? AND i.sender = ? AND i.message_type = 'text'
-         AND LOWER(TRIM(i.body)) IN ('oi', 'olá', 'ola', 'cardápio', 'cardapio', 'menu')
+         AND i.body IS NOT NULL
+         ${placeOrder ? '' : "AND LOWER(TRIM(i.body)) IN ('oi', 'olá', 'ola', 'cardápio', 'cardapio', 'menu')"}
          AND i.received_at >= CURRENT_TIMESTAMP - INTERVAL 2 MINUTE AND r.inbox_id IS NULL
        ORDER BY i.id LIMIT 10`, [companyId, sender]);
 
@@ -62,25 +64,53 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
       if (error.code === 'ER_DUP_ENTRY') continue;
       throw error;
     }
-    const [state, id] = await sendReply(row, token, version, 'https://' + host + '/', fetchGraph);
+    const link = 'https://' + host + '/';
+    let body = 'Olá! Veja o cardápio e faça seu pedido aqui: ' + link;
+    if (placeOrder) {
+      try {
+        body = await handleCart(db, row, placeOrder, link);
+      } catch (error) {
+        body = error.code ? 'Não consegui atualizar o pedido. Tente novamente.' : error.message;
+      }
+    }
+    if (body.length > 4096) body = 'O resumo é longo demais. Remova uma linha ou consulte o cardápio: ' + link;
+    const [state, id] = await sendReply(row, token, version, body, fetchGraph);
     await db.execute('UPDATE whatsapp_initial_replies SET state = ?, provider_message_id = ? WHERE inbox_id = ?',
       [state, id, row.id]);
   }
 }
 
-function startWhatsAppReplies(db, env = process.env) {
+function startWhatsAppReplies(db, env = process.env, placeOrder) {
   const { WHATSAPP_REPLY_PILOT_COMPANY_ID: companyId, WHATSAPP_REPLY_PILOT_SENDER: sender,
     WHATSAPP_CONNECTION_KEY: hexKey, WHATSAPP_META_GRAPH_VERSION: version } = env;
   if (!/^[1-9][0-9]{0,9}$/.test(companyId || '') || !/^[0-9]{6,20}$/.test(sender || '') ||
       !/^[a-f0-9]{64}$/i.test(hexKey || '') || !/^v[0-9]+\.[0-9]+$/.test(version || '')) return () => {};
 
-  const options = { companyId, sender, version, key: Buffer.from(hexKey, 'hex') };
+  const options = { companyId, sender, version, key: Buffer.from(hexKey, 'hex'), placeOrder };
   let running = false;
   const timer = setInterval(async () => {
     if (running) return;
     running = true;
     try {
-      await processInitialReplies(db, options);
+      const lock = createHash('sha256').update('whatsapp-cart:' + companyId + ':' + sender).digest('hex');
+      const conn = await db.getConnection();
+      let reusable = true;
+      try {
+        const [[result]] = await conn.execute('SELECT GET_LOCK(?, 0) AS acquired', [lock]);
+        if (Number(result.acquired) !== 1) return;
+        try {
+          await processInitialReplies(conn, options);
+        } finally {
+          const [[release]] = await conn.execute('SELECT RELEASE_LOCK(?) AS released', [lock]);
+          if (Number(release.released) !== 1) reusable = false;
+        }
+      } catch (error) {
+        reusable = false;
+        throw error;
+      } finally {
+        if (reusable) conn.release();
+        else conn.destroy();
+      }
     } catch {
       console.error('Falha ao processar respostas iniciais do WhatsApp.');
     } finally {
