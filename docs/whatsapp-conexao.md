@@ -22,3 +22,10 @@ da integração com o código do bot da VPS, da inscrição da conta no webhook
 e da verificação de recebimento e envio com a credencial da loja. O piloto
 deve conferir ainda se a Meta exige registro adicional do número escolhido.
 A autorização do número e a ativação do bot são estados distintos.
+
+Configure também `WHATSAPP_WEBHOOK_VERIFY_TOKEN` no mesmo arquivo privado e
+use o mesmo valor na configuração do webhook da Meta. O endereço do callback
+no domínio público é `/api/webhooks/whatsapp`. A inscrição da conta no campo
+`messages` permite testar a recepção. O webhook valida a assinatura sobre o
+corpo original e só grava mensagens de números vinculados a lojas elegíveis.
+As mensagens ficam na caixa de entrada persistente para processamento posterior.
