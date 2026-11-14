@@ -38,6 +38,10 @@ function planUpdate(columns, constraints = []) {
   const whatsappInbox = state(['id','company_id','phone_number_id','message_id','sender','message_type','body','received_at'].map(field => ['company_whatsapp_inbox',field]),'031');
   const initialReplies = state(['inbox_id','state','provider_message_id','created_at'].map(field => ['whatsapp_initial_replies',field]),'032');
   const whatsappCarts = state(['company_id','phone_number_id','sender','items','quote','updated_at'].map(field => ['whatsapp_carts',field]),'033');
+  const handoff = state([
+    ...['company_id','phone_number_id','sender','state','actor_id','skip_through','updated_at'].map(field => ['whatsapp_handoffs', field]),
+    ...['company_id','phone_number_id','sender','request_key','actor_id','body','state','provider_message_id','created_at'].map(field => ['whatsapp_human_replies', field])
+  ], '034');
   if(itemInstructions&&!storeImages)throw new Error('Observações de item sem migrações anteriores.');
   if(menu&&!has('products','image_url'))throw new Error('Cardápio sem coluna de imagem.');
   if(menu&&!impersonation)throw new Error('Cardápio sem migração de acesso assistido.');
@@ -55,7 +59,7 @@ function planUpdate(columns, constraints = []) {
     const type = columns.find(c => c.table_name === table && c.column_name === column)?.column_type;
     if (!/^int(?:\(\d+\))?(?: unsigned)?$/i.test(type || '')) throw new Error('Tipo de ID não suportado nesta atualização: ' + table);
   }
-  return { pending: [...(!operations ? ['004-store-operations.sql'] : []), ...(!addons ? ['005-product-addons.sql'] : []), ...(!coupons ? ['006-coupons.sql'] : []), ...(!drivers ? ['007-delivery-drivers.sql'] : []), ...(!merchandising ? ['008-menu-merchandising.sql'] : []), ...(!images ? ['009-product-images.sql'] : []), ...(!tracking ? ['010-order-tracking.sql'] : []), ...(!reviews ? ['011-order-reviews.sql'] : []), ...(!master ? ['012-platform-master.sql'] : []), ...(!impersonation ? ['013-impersonation.sql'] : []), ...(!menu ? ['014-tenant-menu.sql'] : []), ...(!storeImages ? ['015-store-images.sql'] : []), ...(!itemInstructions ? ['016-item-instructions.sql'] : []), ...(!addonQuantities ? ['017-addon-quantities.sql'] : []), ...(!subscriptionRequests ? ['018-subscription-plans.sql'] : []), ...(!whatsappConnection ? ['030-company-whatsapp-connections.sql'] : []), ...(!whatsappInbox ? ['031-company-whatsapp-inbox.sql'] : []), ...(!initialReplies ? ['032-whatsapp-initial-replies.sql'] : []), ...(!whatsappCarts ? ['033-whatsapp-carts.sql'] : [])], operations, addons, coupons, drivers, merchandising, images, tracking, reviews, master, impersonation, menu, storeImages, itemInstructions, addonQuantities, subscriptionRequests, rollback_before_open_only: true };
+  return { pending: [...(!operations ? ['004-store-operations.sql'] : []), ...(!addons ? ['005-product-addons.sql'] : []), ...(!coupons ? ['006-coupons.sql'] : []), ...(!drivers ? ['007-delivery-drivers.sql'] : []), ...(!merchandising ? ['008-menu-merchandising.sql'] : []), ...(!images ? ['009-product-images.sql'] : []), ...(!tracking ? ['010-order-tracking.sql'] : []), ...(!reviews ? ['011-order-reviews.sql'] : []), ...(!master ? ['012-platform-master.sql'] : []), ...(!impersonation ? ['013-impersonation.sql'] : []), ...(!menu ? ['014-tenant-menu.sql'] : []), ...(!storeImages ? ['015-store-images.sql'] : []), ...(!itemInstructions ? ['016-item-instructions.sql'] : []), ...(!addonQuantities ? ['017-addon-quantities.sql'] : []), ...(!subscriptionRequests ? ['018-subscription-plans.sql'] : []), ...(!whatsappConnection ? ['030-company-whatsapp-connections.sql'] : []), ...(!whatsappInbox ? ['031-company-whatsapp-inbox.sql'] : []), ...(!initialReplies ? ['032-whatsapp-initial-replies.sql'] : []), ...(!whatsappCarts ? ['033-whatsapp-carts.sql'] : []), ...(!handoff ? ['034-whatsapp-handoff.sql'] : [])], operations, addons, coupons, drivers, merchandising, images, tracking, reviews, master, impersonation, menu, storeImages, itemInstructions, addonQuantities, subscriptionRequests, rollback_before_open_only: true };
 }
 async function inspect(db) {
   const [columns] = await db.query('SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, COLUMN_TYPE AS column_type FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, ORDINAL_POSITION');
@@ -83,7 +87,7 @@ function subscriptionRequestMigrationSql(companyIdType, filename = '018-subscrip
   if (!/^int(?:\(\d+\))?(?: unsigned)?$/i.test(companyIdType || '')) throw new Error('Tipo de companies.id não suportado pela migração de planos.');
   const foreignKeyType = companyIdType.replace(/\(\d+\)/, '').toUpperCase();
   return fs.readFileSync(path.join(__dirname, '../../database', filename), 'utf8')
-    .replace(/^--.*$/gm, '').replace(/company_id INT(?: UNSIGNED)? (?=PRIMARY KEY|NOT NULL)/, 'company_id ' + foreignKeyType + ' ');
+    .replace(/^--.*$/gm, '').replace(/company_id INT(?: UNSIGNED)? (?=PRIMARY KEY|NOT NULL)/g, 'company_id ' + foreignKeyType + ' ');
 }
 async function applyUpdate(db) {
   const schema = await inspect(db), before = await snapshot(db, schema);
@@ -93,7 +97,7 @@ async function applyUpdate(db) {
   });
   if (Number(invalidFee.n)) throw new Error('Frete negativo no histórico exige revisão.');
   for (const filename of schema.plan.pending) {
-    const sql = ['018-subscription-plans.sql', '030-company-whatsapp-connections.sql', '031-company-whatsapp-inbox.sql', '033-whatsapp-carts.sql'].includes(filename)
+    const sql = ['018-subscription-plans.sql', '030-company-whatsapp-connections.sql', '031-company-whatsapp-inbox.sql', '033-whatsapp-carts.sql', '034-whatsapp-handoff.sql'].includes(filename)
       ? subscriptionRequestMigrationSql(schema.columns.find(column => column.table_name === 'companies' && column.column_name === 'id')?.column_type, filename)
       : fs.readFileSync(path.join(__dirname, '../../database', filename), 'utf8').replace(/^--.*$/gm, '');
     for (const statement of sql.split(';').map(s => s.trim()).filter(Boolean)) await db.query(statement);

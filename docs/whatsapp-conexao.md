@@ -51,3 +51,10 @@ por empresa, número comercial e remetente.
 Para pedir troco, use `Dinheiro 50,00` no campo de pagamento. O resumo
 mostra o valor entregue e o troco. Após a confirmação, a informação
 aparece nas observações do pedido no painel.
+
+No piloto, envie `Quero falar com um atendente`. No painel da loja,
+abra **Configurações → WhatsApp automatizado → Abrir atendimentos do WhatsApp**.
+A equipe pode assumir a conversa, conferir mensagens recentes e o carrinho,
+responder pelo número da loja e retomar o bot. Ao retomar, o bot só processa
+mensagens posteriores à retomada. A migração 034 persiste a pausa e as
+tentativas da equipe. Resultado incerto precisa ser conferido no WhatsApp.
