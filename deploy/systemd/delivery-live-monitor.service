@@ -1,5 +1,5 @@
 [Unit]
-Description=Verifica HTTPS API e idade dos backups Delivery SaaS
+Description=Verifica HTTPS API e idade dos backups Apex Delivery
 After=network-online.target
 Wants=network-online.target
 

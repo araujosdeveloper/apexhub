@@ -1,4 +1,4 @@
-# Dashboard ApexHub
+# Dashboard Apex Delivery
 
 Publicado em 04/11/2026 às 20:45 UTC, conforme a direção visual solicitada. STATUS=PUBLICADO confirmado em `reports/update-20261104T204408Z-3046376`; backup final `backups/live/live-20261104T204529Z-3051123`. Conferência visual pelo responsável ainda pendente. Não exige migração ou altera registros existentes.
 
@@ -9,7 +9,7 @@ Publicado em 04/11/2026 às 20:45 UTC, conforme a direção visual solicitada. S
 - `frontend/dashboard.js`: acesso à API, renderização, SVG/donut, busca, notificações, perfil, menu móvel e atualização.
 - `backend/src/dashboard.js`: endpoints de indicadores e pesquisa rápida, instalados na API existente.
 
-Fundo #121212, sidebar #161616, superfícies #1E1E1E, primária #FF7F00, textos #F5F5F5/#B0B0B0, sucesso #00E676 e alerta #FF5252. Tipografia Inter com fallback para fontes sans-serif do sistema; nenhuma fonte ou biblioteca externa é necessária. Ícone ApexHub em SVG, avatar com iniciais reais, foco visível, atalhos de teclado, preferência de movimento reduzido e transições de 200 ms.
+Fundo #121212, sidebar #161616, superfícies #1E1E1E, primária #FF7F00, textos #F5F5F5/#B0B0B0, sucesso #00E676 e alerta #FF5252. Tipografia Inter com fallback para fontes sans-serif do sistema; nenhuma fonte ou biblioteca externa é necessária. Ícone Apex Delivery em SVG, avatar com iniciais reais, foco visível, atalhos de teclado, preferência de movimento reduzido e transições de 200 ms.
 
 Sidebar fixa e rolável em desktop, drawer com backdrop em celular. Conteúdo usa Grid/Flex, cartões em quatro/duas colunas, gráficos e painéis que empilham nas telas menores. Tabelas têm rolagem horizontal em telas estreitas. O gráfico SVG ajusta a largura ao contêiner e mantém tabela diária acessível com os valores.
 

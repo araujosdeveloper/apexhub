@@ -1,8 +1,14 @@
+const { enabled: noticesEnabled, sender: noticeSender, grantNoticeConsent, updateWithNotice } = require('./whatsapp-notices');
+const { cashChangeNote } = require('./cash-change');
 const {installImpersonation}=require('./impersonation');
 const {platformAdminRouter}=require('./routes/platform-admin');
 const {isPlatformAdminPath,responseEnvelope}=require('./platform-admin-http');
 const {configuration}=require('./jwt');
 const {requireRoles}=require('./middlewares/auth');
+const {checkSubscription,installSubscriptions,loadSubscription,subscriptionRequired}=require('./subscriptions');
+const { installWhatsAppInbound } = require('./whatsapp-inbound');
+const { installWhatsAppHandoff } = require('./whatsapp-handoff');
+const { installWhatsAppConnection } = require('./whatsapp-connection');
 const { installMaster } = require('./master');
 const { installAppShell } = require('./app-shell');
 const { installDashboard } = require('./dashboard');
@@ -19,12 +25,14 @@ const { installCoupons, couponCode, phoneKey, evaluateCoupon } = require('./coup
 const { priceCart } = require('./cart-pricing');
 const { createOrderEvents } = require('./order-events');
 const { installOrderBoard } = require('./order-board');
+const { installTenantOrders } = require('./tenant-orders');
 const { installAddons, normalizeLines, priceLine, publicProduct } = require('./addons');
 const path = require('node:path');
 const { installAuth, asyncRoute } = require('./auth');
 const { installCatalogEditing } = require('./catalog');
 const { checkoutHash, reserveCheckout } = require('./checkout');
 const { loadOperations, availability, quoteDelivery, installOperations } = require('./operations');
+const { configuredDomain, isRootHost, isMasterHost, tenantSlugFromHost, RESERVED } = require('./public-hosts');
 function createApp(db, options = {}) {
   const app = express();
   app.locals.logger=options.logger||console;
@@ -33,6 +41,7 @@ function createApp(db, options = {}) {
   app.locals.orderEvents = orderEvents;
   app.disable('x-powered-by');
   app.use((req,res,next)=>isPlatformAdminPath(req.path)?responseEnvelope(req,res,next):next());
+  installWhatsAppInbound(app, db, options.whatsappConnection);
   app.use(express.json({ limit: '64kb' }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -48,9 +57,12 @@ function createApp(db, options = {}) {
     next();
   });
   const auth = installAuth(app, db, options);
+  installSubscriptions(app, db, auth);
+  installWhatsAppConnection(app, db, auth, options.whatsappConnection);
+  installWhatsAppHandoff(app, db, auth, options.whatsappConnection);
   installImpersonation(app,db,options);
   const menuImportGate=require('./menu-import-ai').importGate({key:req=>req.auth.scope==='master'?'master:'+req.master.id:'tenant:'+req.tenantId});
-  app.use('/api/tenant/menu',require('./routes/tenant-menu').tenantMenuRouter(db,auth,app.locals.logger,{extractor:options.menuImportExtractor,gate:menuImportGate}));
+  app.use('/api/tenant/menu',require('./routes/tenant-menu').tenantMenuRouter(db,auth,app.locals.logger,{extractor:options.menuImportExtractor,gate:menuImportGate,aiSubscriptionGate:checkSubscription(db,'ai_menu_import')}));
   app.use('/api/tenant/reports',require('./advanced-reports').tenantReportsRouter(db,auth,app.locals.logger));
   app.use('/api/admin',platformAdminRouter(db,{jwt:app.locals.jwt,prices:options.planPrices,logger:options.logger||console,menuImportExtractor:options.menuImportExtractor,menuImportGate}));
   // Demais rotas administrativas exigem identidade e tenant.
@@ -60,7 +72,22 @@ function createApp(db, options = {}) {
     await db.execute('SELECT 1');
     res.json({ status: 'ok' });
   }));
+  // Endpoint interno usado pelo Caddy On-Demand TLS: só emite certificado
+  // para o domínio oficial e para subdomínios de lojas ativas.
+  app.get('/api/internal/domain-cert', asyncRoute(async (req, res) => {
+    const rootDomain = configuredDomain();
+    const domain = typeof req.query.domain === 'string' ? req.query.domain.trim().toLowerCase().replace(/\.$/, '') : '';
+    if (domain === rootDomain || domain === `www.${rootDomain}` || domain === `admin.${rootDomain}`) return res.sendStatus(204);
+    const suffix = `.${rootDomain}`;
+    if (!domain.endsWith(suffix)) return res.sendStatus(404);
+    const slug = domain.slice(0, -suffix.length);
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug) || RESERVED.has(slug)) return res.sendStatus(404);
+    const [companies] = await db.execute('SELECT id FROM companies WHERE slug = ? AND active = 1 LIMIT 1', [slug]);
+    return companies.length ? res.sendStatus(204) : res.sendStatus(404);
+  }));
   app.get('/api/menu/:slug', asyncRoute(async (req, res) => {
+    const hostSlug = tenantSlugFromHost(req);
+    if (isMasterHost(req) || (hostSlug && hostSlug !== req.params.slug)) return res.status(404).json({ error: 'Restaurante não encontrado.' });
     const [companies] = await db.execute('SELECT id, name, slug, whatsapp_phone FROM companies WHERE slug = ? AND active = 1', [req.params.slug]);
     if (!companies.length) return res.status(404).json({ error: 'Restaurante não encontrado.' });
     const company = companies[0];
@@ -69,7 +96,7 @@ function createApp(db, options = {}) {
       LEFT JOIN product_images i ON i.product_id=p.id JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
       WHERE p.company_id = ? AND p.active = 1 AND c.active = 1 ORDER BY p.id`, [company.id]);
     const menu = await decorateMenu(db, company.id, products.map(product => withImage(publicProduct(product))));
-    res.json({ company, categories, ...menu, operations: availability(await loadOperations(db, company.id)) });
+    res.json({ company, categories, ...menu, ...(noticesEnabled() ? { whatsapp_status_available: true } : {}), operations: availability(await loadOperations(db, company.id)) });
   }));
   const manage = requireRoles('tenant_owner','tenant_manager');
   installCatalogEditing(app, db, auth, manage);
@@ -80,10 +107,11 @@ function createApp(db, options = {}) {
   require('./store-images').installStoreImages(app,db,auth,manage);
   installAddons(app, db, auth, manage);
   installOrderBoard(app, db, auth, orderEvents);
+  installTenantOrders(app, db, auth, orderEvents);
   installOrderTracking(app, db, auth);
   installReviews(app, db, auth);
   installDashboard(app, db, auth);
-  installCoupons(app, db, auth, manage);
+  installCoupons(app, db, auth, manage, checkSubscription(db,'coupons'));
   installCustomers(app, db, auth);
   installReports(app, db, auth);
   installTeam(app, db, auth);
@@ -131,7 +159,7 @@ function createApp(db, options = {}) {
       fulfillment_method, delivery_fee, fulfillment_address, estimated_minutes, coupon_code, discount_amount, coupon_snapshot
       FROM orders WHERE company_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`, [req.tenantId]);
     if (!orders.length) return res.json([]);
-    const [items] = await db.execute(`SELECT oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot
+    const [items] = await db.execute(`SELECT oi.order_id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price, oi.addons_snapshot, oi.item_notes
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE o.company_id = ? AND o.id IN (${orders.map(() => '?').join(',')})`, [req.tenantId, ...orders.map(o => o.id)]);
     res.json(orders.map(order => ({ ...order, items: items.filter(i => i.order_id === order.id) })));
@@ -143,7 +171,7 @@ function createApp(db, options = {}) {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1 || !['preparing', 'ready', 'delivering', 'completed', 'cancelled'].includes(status) || (expected !== undefined && !['pending','preparing','ready','delivering','completed','cancelled'].includes(expected))) return res.status(400).json({ error: 'Pedido ou status inválido.' });
     const allowed = Object.keys(transitions).filter(key => transitions[key].includes(status));
-    const [result] = await db.execute(`UPDATE orders SET status = ? WHERE id = ? AND company_id = ? AND status IN (${allowed.map(() => '?').join(',')})${status === 'delivering' ? " AND fulfillment_method = 'delivery'" : ''}${expected !== undefined ? ' AND status = ?' : ''}`, [status, id, req.tenantId, ...allowed, ...(expected !== undefined ? [expected] : [])]);
+    const [result] = await updateWithNotice(db, `UPDATE orders SET status = ? WHERE id = ? AND company_id = ? AND status IN (${allowed.map(() => '?').join(',')})${status === 'delivering' ? " AND fulfillment_method = 'delivery'" : ''}${expected !== undefined ? ' AND status = ?' : ''}`, [status, id, req.tenantId, ...allowed, ...(expected !== undefined ? [expected] : [])], { companyId: req.tenantId, orderId: id, target: status });
     if (!result.affectedRows) {
       const [rows] = await db.execute('SELECT id FROM orders WHERE id = ? AND company_id = ?', [id, req.tenantId]);
       return res.status(rows.length ? 409 : 404).json({ error: rows.length ? 'Transição de status não permitida. Atualize o painel.' : 'Pedido não encontrado.' });
@@ -151,8 +179,15 @@ function createApp(db, options = {}) {
     orderEvents.publish(req.tenantId);
     res.json({ success: true });
   }));
-  app.post('/api/orders', asyncRoute(async (req, res) => {
-    const { company_id, items, payment_method, fulfillment_method = 'delivery', delivery_fee } = req.body || {};
+  const placeOrder = async (req, res, expectedTotalCents, cashCents) => {
+    const body = req.body || {};
+    const company_id = body.tenant_id ?? body.company_id;
+    const hostSlug = tenantSlugFromHost(req);
+    if (isMasterHost(req)) return res.status(404).json({ error: 'Rota não encontrada.' });
+    const { items, payment_method, fulfillment_method = 'delivery', delivery_fee } = body;
+    if (cashCents !== undefined && (payment_method !== 'Dinheiro' || !Number.isSafeInteger(cashCents) || cashCents < 1 || cashCents > 999999999)) {
+      return res.status(400).json({ error: 'Informe um valor de troco válido para pagamento em dinheiro.' });
+    }
     let code = '';
     try { if (req.body?.coupon_code !== undefined && req.body.coupon_code !== '') code = couponCode(req.body.coupon_code); }
     catch (error) { return res.status(400).json({ error: error.message }); }
@@ -167,13 +202,15 @@ function createApp(db, options = {}) {
     const requestKey = req.get('Idempotency-Key');
     if (!requestKey || !/^[a-zA-Z0-9_-]{16,80}$/.test(requestKey)) return res.status(400).json({ error: 'Identificador de envio ausente ou inválido. Atualize a loja antes de enviar.' });
     const fields = ['name', 'phone', 'street', 'number', 'neighborhood'];
-    if (!['delivery', 'pickup'].includes(fulfillment_method) ||
+    if ((body.tenant_id !== undefined && body.company_id !== undefined && body.tenant_id !== body.company_id) ||
+      !['delivery', 'pickup'].includes(fulfillment_method) ||
       (delivery_fee !== undefined && (typeof delivery_fee !== 'string' || !/^\d{1,4}\.\d{2}$/.test(delivery_fee))) ||
       !Number.isSafeInteger(company_id) || company_id < 1 || !customer || fields.some(f => typeof customer[f] !== 'string' || (fulfillment_method === 'delivery' || ['name', 'phone'].includes(f)) && !customer[f].trim() || customer[f].length > 160) ||
       !Array.isArray(items) || !items.length || items.length > 100 || !['Pix', 'Cartão de Crédito', 'Dinheiro'].includes(payment_method) ||
-      items.some(i => !i || !Number.isSafeInteger(i.product_id || i.id) || (i.product_id || i.id) < 1 || !Number.isSafeInteger(i.quantity) || i.quantity < 1 || i.quantity > 99)) {
+      items.some(i => !i || !Number.isSafeInteger(i.product_id || i.id) || (i.product_id || i.id) < 1 || !Number.isSafeInteger(i.quantity) || i.quantity < 1 || i.quantity > 99 || (i.notes !== undefined && (typeof i.notes !== 'string' || i.notes.length > 500)))) {
       return res.status(400).json({ error: 'Confira os dados de entrega, os itens e a forma de pagamento.' });
     }
+    const noticeConsent = noticesEnabled() && body.whatsapp_status_consent === true && Boolean(noticeSender(customer.phone));
     let quantities, lines;
     try { ({ quantities, lines } = normalizeLines(items)); }
     catch (error) { return res.status(400).json({ error: error.message }); }
@@ -182,7 +219,11 @@ function createApp(db, options = {}) {
       await conn.beginTransaction();
       const [companies] = await conn.execute('SELECT id FROM companies WHERE id = ? AND active = 1 FOR UPDATE', [company_id]);
       if (!companies.length) { await conn.rollback(); return res.status(404).json({ error: 'Restaurante indisponível.' }); }
-      const reservation = await reserveCheckout(conn, company_id, requestKey, checkoutHash(company_id, customer, payment_method, quantities, fulfillment_method, delivery_fee, lines, code, couponDiscount, couponSubtotal));
+      if (hostSlug) {
+        const [[company]] = await conn.execute('SELECT slug FROM companies WHERE id = ? AND active = 1', [company_id]);
+        if (!company || company.slug !== hostSlug) { await conn.rollback(); return res.status(404).json({ error: 'Restaurante indisponível neste domínio.' }); }
+      }
+      const reservation = await reserveCheckout(conn, company_id, requestKey, checkoutHash(company_id, customer, payment_method, quantities, fulfillment_method, delivery_fee, lines, code, couponDiscount, couponSubtotal, cashCents, body.whatsapp_status_consent === true));
       if (reservation.conflict) { await conn.rollback(); return res.status(409).json({ error: 'Este envio já foi usado com outros dados. Confira o pedido antes de tentar novamente.' }); }
       if (reservation.order) {
         const tracking_url=await ensureTracking(conn,reservation.order.id);
@@ -200,11 +241,23 @@ function createApp(db, options = {}) {
       let priced, coupon = null;
       try {
         priced = await priceCart(conn, company_id, quantities, lines, Math.round(Number(quote.fee) * 100));
-        if (code) coupon = await evaluateCoupon(conn, { companyId: company_id, code, phone: customer.phone, subtotalCents: priced.subtotalCents, deliveryCents: Math.round(Number(quote.fee) * 100), method: fulfillment_method, lock: true });
+        if (code) {
+          const subscription = await loadSubscription(conn, company_id);
+          if (!subscription.features?.includes('coupons')) { await conn.rollback(); return subscriptionRequired(res, subscription, 'coupons'); }
+          coupon = await evaluateCoupon(conn, { companyId: company_id, code, phone: customer.phone, subtotalCents: priced.subtotalCents, deliveryCents: Math.round(Number(quote.fee) * 100), method: fulfillment_method, lock: true });
+        }
         if (coupon && (Number(couponDiscount) !== coupon.discountCents / 100 || Number(couponSubtotal) !== priced.subtotalCents / 100)) { await conn.rollback(); return res.status(409).json({ error: 'O desconto mudou. Aplique o cupom novamente e confira o total.' }); }
       } catch (error) { if (error.code) throw error; await conn.rollback(); return res.status(400).json({ error: error.message }); }
       const { pricedLines } = priced;
       const discountCents = coupon?.discountCents || 0, totalCents = priced.grossCents - discountCents;
+      if (expectedTotalCents !== undefined && expectedTotalCents !== totalCents) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'O total mudou. Solicite um novo resumo antes de confirmar.' });
+      }
+      if (cashCents !== undefined && cashCents < totalCents) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'O valor em dinheiro precisa cobrir o total do pedido.' });
+      }
       await conn.execute(`INSERT INTO customers (company_id, name, phone, address_street, address_number, address_neighborhood) VALUES (?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE name = VALUES(name), address_street = IF(VALUES(address_street) = '', address_street, VALUES(address_street)), address_number = IF(VALUES(address_street) = '', address_number, VALUES(address_number)), address_neighborhood = IF(VALUES(address_street) = '', address_neighborhood, VALUES(address_neighborhood))`,
       [company_id, ...fields.map(f => customer[f].trim())]);
@@ -216,12 +269,17 @@ function createApp(db, options = {}) {
         fulfillment_method, quote.fee, fulfillment_method === 'pickup' ? operations.pickup_address : '',
         fulfillment_method === 'pickup' ? operations.pickup_minutes : operations.delivery_minutes,
         (discountCents / 100).toFixed(2), code, coupon ? JSON.stringify(coupon.snapshot) : null, phoneKey(customer.phone)]);
+      if (cashCents !== undefined) {
+        await conn.execute('UPDATE orders SET notes = ? WHERE id = ? AND company_id = ?',
+          [cashChangeNote(cashCents, totalCents), order.insertId, company_id]);
+      }
       for (const line of pricedLines) {
-        await conn.execute('INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, addons_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [order.insertId, line.product_id, line.name, line.quantity, (line.unitCents / 100).toFixed(2), (line.unitCents * line.quantity / 100).toFixed(2), JSON.stringify(line.snapshot)]);
+        await conn.execute('INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, addons_snapshot, item_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [order.insertId, line.product_id, line.name, line.quantity, (line.unitCents / 100).toFixed(2), (line.unitCents * line.quantity / 100).toFixed(2), JSON.stringify(line.snapshot), line.notes || '']);
       }
       if (coupon) await conn.execute('UPDATE company_coupons SET usage_count = usage_count + 1 WHERE id = ? AND company_id = ?', [coupon.id, company_id]);
       const tracking_url=await ensureTracking(conn,order.insertId);
+      if (noticeConsent) await grantNoticeConsent(conn, company_id, order.insertId);
       await conn.execute('UPDATE checkout_requests SET order_id = ? WHERE company_id = ? AND request_key = ?', [order.insertId, company_id, requestKey]);
       await conn.commit();
       orderEvents.publish(company_id);
@@ -230,7 +288,58 @@ function createApp(db, options = {}) {
         estimated_minutes: fulfillment_method === 'pickup' ? operations.pickup_minutes : operations.delivery_minutes });
     } catch (err) { await conn.rollback(); throw err; }
     finally { conn.release(); }
+  };
+  app.post('/api/orders', asyncRoute((req, res) => placeOrder(req, res)));
+  app.locals.placeWhatsAppOrder = async (body, requestKey, expectedTotalCents, cashCents) => {
+    let status = 200;
+    return placeOrder({
+      body, get: name => name === 'Idempotency-Key' ? requestKey : undefined
+    }, {
+      status(code) { status = code; return this; },
+      json(data) { return { status, ...data }; }
+    }, expectedTotalCents, cashCents);
+  };
+  const frontendFile = name => path.join(__dirname, '../../frontend', name);
+  app.get('/', asyncRoute(async (req, res, next) => {
+    const host = String(req.hostname || '').toLowerCase();
+    if (isRootHost(req)) {
+      // Compatibilidade com links antigos de cardápio no domínio raiz.
+      const requestedSlug = req.query.loja;
+      if (typeof requestedSlug === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requestedSlug)) {
+        const [companies] = await db.execute('SELECT id FROM companies WHERE slug = ? AND active = 1 LIMIT 1', [requestedSlug]);
+        if (companies.length) return res.sendFile(frontendFile('index.html'));
+      }
+      return res.sendFile(frontendFile('landing.html'));
+    }
+    if (isMasterHost(req)) return res.sendFile(frontendFile('master-login.html'));
+    const slug = tenantSlugFromHost(host);
+    if (!slug) return next();
+    const [companies] = await db.execute('SELECT id FROM companies WHERE slug = ? AND active = 1 LIMIT 1', [slug]);
+    if (!companies.length) return res.status(404).send('Loja não encontrada ou suspensa.');
+    return res.sendFile(frontendFile('index.html'));
   }));
+  app.get('/painel', asyncRoute(async (req, res, next) => {
+    if (isMasterHost(req)) return res.status(404).send('Página não encontrada.');
+    if (isRootHost(req)) return res.redirect(302, '/login.html');
+    const slug = tenantSlugFromHost(req);
+    if (!slug) return next();
+    const [companies] = await db.execute('SELECT id FROM companies WHERE slug = ? AND active = 1 LIMIT 1', [slug]);
+    if (!companies.length) return res.status(404).send('Loja não encontrada ou suspensa.');
+    return res.sendFile(frontendFile('login.html'));
+  }));
+  app.get('/login.html', (req, res, next) => isMasterHost(req) ? res.redirect(308, '/master-login.html') : next());
+  app.get(['/master', '/master/'], (req, res, next) => {
+    if (isMasterHost(req)) return res.sendFile(frontendFile('master.html'));
+    if (isRootHost(req)) return res.redirect(308, `https://admin.${configuredDomain()}/master`);
+    if (tenantSlugFromHost(req)) return res.status(404).send('Página não encontrada.');
+    return res.sendFile(frontendFile('master.html'));
+  });
+  app.get(['/master.html', '/master-login.html'], (req, res, next) => {
+    if (isMasterHost(req)) return next();
+    if (isRootHost(req)) return res.redirect(308, `https://admin.${configuredDomain()}${req.path}`);
+    if (tenantSlugFromHost(req)) return res.status(404).send('Página não encontrada.');
+    return next();
+  });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));
   installAppShell(app);
   app.use(express.static(path.join(__dirname, '../../frontend')));

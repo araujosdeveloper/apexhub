@@ -40,6 +40,8 @@ services:
         required: false
       - path: .env.ai
         required: false
+      - path: .env.whatsapp
+        required: false
     build: .
     restart: unless-stopped
     environment:
@@ -50,11 +52,13 @@ services:
       NODE_ENV: production
       SECURE_COOKIES: "true"
       PORT: "3000"
+      PUBLIC_BASE_DOMAIN: ${PUBLIC_BASE_DOMAIN:-apexdelivery.com.br}
     networks:
       default:
       public:
         aliases:
           - ${RELEASE_ALIAS:?Identificador da aplicação necessário}
+          - delivery-domain-check
     read_only: true
     tmpfs:
       - /tmp

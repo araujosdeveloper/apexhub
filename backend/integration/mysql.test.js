@@ -60,6 +60,18 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  assert.equal(orderA.order_id, orderB.order_id); assert.equal(orderA.total_amount, 24.7);
  const [count] = await db.execute('SELECT COUNT(*) AS total FROM orders WHERE company_id = ?', [a.id]); assert.equal(count[0].total, 1);
  t.diagnostic('Checkout concorrente criou somente um pedido com preço calculado no servidor.');
+ const instructions = { ...payload, items: [{ product_id: product.id, quantity: 1, notes: 'Sem milho' }, { product_id: product.id, quantity: 1, notes: 'Com milho' }] };
+ const noted = await request('/api/orders', json('POST', instructions, null, randomUUID()));
+ assert.equal(noted.status, 201);
+ const notedId = (await noted.json()).order_id;
+ const [notedItems] = await db.execute('SELECT item_notes,quantity FROM order_items WHERE order_id=? ORDER BY item_notes', [notedId]);
+ assert.deepEqual(notedItems.map(item => [item.item_notes,item.quantity]), [['Com milho',1],['Sem milho',1]]);
+ // Keep the remainder of the existing scenario's counts unchanged.
+ await db.execute('DELETE FROM checkout_requests WHERE order_id=?', [notedId]);
+ await db.execute('DELETE FROM order_tracking WHERE order_id=?', [notedId]);
+ await db.execute('DELETE FROM order_items WHERE order_id=?', [notedId]);
+ await db.execute('DELETE FROM orders WHERE id=? AND company_id=?', [notedId,a.id]);
+
  const hidden = await request('/api/admin/orders/' + orderA.order_id + '/status', json('PATCH', { status: 'preparing' }, b.cookie)); assert.equal(hidden.status, 404);
  assert.deepEqual(await (await request('/api/admin/orders', { headers: { Cookie: b.cookie } })).json(), []);
  const changed = await request('/api/orders', json('POST', { ...payload, customer: { ...payload.customer, number: '20' } }, null, key)); assert.equal(changed.status, 409);
@@ -142,7 +154,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
  t.diagnostic('Master: autenticação exclusiva, busca, revisão, suspensão, sessões e auditoria aprovados.');
  t.diagnostic('Acesso assistido: emissão, troca única, imagens, isolamento, suspensão e revogação pelo Master aprovados.');
  t.diagnostic('API Super Admin: cadastro transacional, paginação, status, revogação, métricas e restrição de perfil aprovados.');
- t.diagnostic('ApexHub: indicadores, receita bruta, origem, busca e isolamento aprovados.');
+ t.diagnostic('Apex Delivery: indicadores, receita bruta, origem, busca e isolamento aprovados.');
  t.diagnostic('Avaliações: conclusão, nota, idempotência, concorrência e isolamento aprovados.');
  t.diagnostic('Acompanhamento: checkout/reenvio, token privado, status, legado e isolamento aprovados.');
  t.diagnostic('Fotos: upload, leitura binária, categorias pausadas, remoção e isolamento aprovados.');
@@ -230,6 +242,15 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
    for(const sql of storeImageMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
    await connection.execute(`INSERT INTO ${names.store_images}(company_id,kind,content_type,content,digest) VALUES (1,'logo','image/png',?,SHA2(?,256))`,[png,png]);
    await assert.rejects(connection.execute(`INSERT INTO ${names.store_images}(company_id,kind,content_type,content,digest) VALUES (999,'logo','image/png',?,SHA2(?,256))`,[png,png]),error=>error.code==='ER_NO_REFERENCED_ROW_2');
+   const itemNotesMigration=fs.readFileSync(path.join(__dirname,'../../database/016-item-instructions.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\border_items\b/g,names.order_items);
+   for(const sql of itemNotesMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
+   await connection.execute(`UPDATE ${names.order_items} SET item_notes='Sem cebola' WHERE id=1`);const [[itemNote]]=await connection.query(`SELECT item_notes FROM ${names.order_items} WHERE id=1`);assert.equal(itemNote.item_notes,'Sem cebola');
+   const quantityConstraint='quantity_range_'+suffix;
+   const quantityMigration=fs.readFileSync(path.join(__dirname,'../../database/017-addon-quantities.sql'),'utf8').replace(/^--.*$/gm,'').replace(/\bproduct_options\b/g,names.product_options).replaceAll('product_options_quantity_range',quantityConstraint);
+   for(const sql of quantityMigration.split(';').map(s=>s.trim()).filter(Boolean))await connection.query(sql);
+   const [[quantityRule]]=await connection.execute(`SELECT CONSTRAINT_NAME AS name FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND CONSTRAINT_TYPE='CHECK' AND CONSTRAINT_NAME=?`,[names.product_options,quantityConstraint]);assert.ok(quantityRule);
+   await connection.execute(`UPDATE ${names.product_options} SET max_quantity=2 WHERE tenant_id=1 AND product_id=1 AND option_key='cheese'`);
+   await assert.rejects(connection.execute(`UPDATE ${names.product_options} SET max_quantity=21 WHERE tenant_id=1 AND product_id=1 AND option_key='cheese'`));
    const [master]=await connection.execute(`INSERT INTO ${names.platform_admins}(name,email,password_hash) VALUES ('Teste','master@example.com','fixture')`);
    await connection.execute(`INSERT INTO ${names.platform_sessions}(token_hash,admin_id,expires_at) VALUES (?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR))`,['a'.repeat(64),master.insertId]);
    await connection.execute(`INSERT INTO ${names.platform_impersonations}(id,admin_id,master_session_hash,company_id,owner_id,expires_at) VALUES (?,?,?,1,1,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR))`,['b'.repeat(64),master.insertId,'a'.repeat(64)]);
@@ -239,7 +260,7 @@ test('MySQL: duas lojas, catálogo, isolamento e checkout concorrente', { timeou
    finally { connection.release(); }
   }
  }
- t.diagnostic('Migrações 004/005/006/007/008/009/010/011/012/013/014/015 preservaram pedidos, fretes e opções legadas para IDs INT e INT UNSIGNED.');
+ t.diagnostic('Migrações 004/005/006/007/008/009/010/011/012/013/014/015/016 preservaram pedidos, fretes, adicionais e observações para IDs INT e INT UNSIGNED.');
  const [metadata] = await db.query(fs.readFileSync(path.join(__dirname, '../../database/inventory.sql'), 'utf8'));
  const rawInventory = Object.values(metadata[0])[0];
  const inventory = typeof rawInventory === 'string' ? JSON.parse(rawInventory) : rawInventory;

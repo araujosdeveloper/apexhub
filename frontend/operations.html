@@ -1,8 +1,10 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="/apex-tokens.css"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Operação da loja</title>
+<html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="/apex-tokens.css"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Operação da loja · Apex Delivery</title>
 <style>
 *{box-sizing:border-box}body{font:16px system-ui;color:#172139;background:#f4f6fa;margin:0}main{max-width:1000px;margin:32px auto;padding:0 20px}a{color:#2563eb}h1{margin-bottom:8px}p{color:#657087;line-height:1.5}section{background:#fff;border:1px solid #e3e7ee;border-radius:12px;padding:24px;margin-top:20px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}label{display:block;margin:14px 0 6px}input,select,button{font:inherit}input,select{width:100%;padding:10px;border:1px solid #cbd2df;border-radius:6px}input[type=checkbox]{width:auto;margin-right:8px}button{background:#2563eb;color:white;border:0;border-radius:6px;padding:10px 16px;cursor:pointer}button:disabled{opacity:.5}.secondary{background:#edf2fa;color:#172139}.row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:end;border-top:1px solid #e3e7ee;padding:12px 0}.row button{margin-bottom:1px}.zones .row{grid-template-columns:2fr 1fr auto}#message{min-height:24px;color:#b42318}#live-status{font-weight:600;color:#172139}.actions{position:sticky;bottom:0;background:#f4f6fa;padding:18px 0;display:flex;gap:16px;align-items:center}@media(max-width:650px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr 1fr}.zones .row{grid-template-columns:1fr 1fr}.row button{grid-column:1/-1}}
-</style><link rel="stylesheet" href="/admin-theme.css" media="screen"><script src="/assisted-context.js"></script><script src="/frame-bridge.js"></script></head><body class="apex-view apex-view-operations"><main>
+</style><link rel="stylesheet" href="/admin-theme.css" media="screen"><script src="/assisted-context.js"></script><script src="/frame-bridge.js"></script>  <meta name="description" content="Painel de gestão de pedidos, cardápio e operação de delivery da Apex Delivery.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head><body class="apex-view apex-view-operations"><main>
 <a href="/admin.html">← Voltar aos pedidos</a><h1>Operação da loja</h1><p>Defina quando receber pedidos, onde entregar e como atender quem prefere retirar.</p>
 <p id="live-status" role="status">Carregando configurações…</p>
 <form id="operations-form"><fieldset id="settings-fields" disabled style="border:0;padding:0;margin:0">
@@ -12,7 +14,22 @@
 <section><h2>Modalidades e prazos</h2><div class="grid"><div><label><input type="checkbox" id="delivery-enabled">Delivery</label><label for="delivery-minutes">Previsão de entrega em minutos</label><input id="delivery-minutes" type="number" min="1" max="240" required></div><div><label><input type="checkbox" id="pickup-enabled">Retirada no balcão</label><label for="pickup-minutes">Previsão de retirada em minutos</label><input id="pickup-minutes" type="number" min="1" max="240" required></div></div><label for="pickup-address">Endereço completo para retirada</label><input id="pickup-address" maxlength="320" placeholder="Rua, número, bairro e cidade"><p>O endereço aparece para o cliente ao escolher retirada.</p></section>
 <section class="zones"><h2>Áreas e taxas de entrega</h2><label><input type="checkbox" id="zones-enabled">Entregar somente nos bairros cadastrados abaixo</label><p>Quando desativado, a loja aceita qualquer bairro, sem taxa de entrega. Quando ativado, cada bairro tem sua própria taxa; outros bairros não podem finalizar delivery.</p><div id="zones"></div><button type="button" id="add-zone" class="secondary">Adicionar bairro</button></section>
 <div class="actions"><button id="save">Salvar operação</button><span id="message" role="status" aria-live="polite"></span></div>
-</fieldset></form></main>
+</fieldset></form>
+<section id="whatsapp-settings" hidden>
+  <h2>WhatsApp automatizado</h2>
+  <p><a href="/whatsapp-attendance.html" target="_blank" rel="noopener">Abrir atendimentos do WhatsApp</a></p>
+  <p id="whatsapp-status" role="status" aria-live="polite">Consultando a conexão…</p>
+  <button id="connect-whatsapp" type="button" hidden disabled>Conectar WhatsApp</button>
+  <button id="test-whatsapp" type="button" hidden>Testar conexão</button>
+  <button id="toggle-whatsapp" type="button" hidden>Ativar automação</button>
+  <button id="disconnect-whatsapp" type="button" hidden>Desconectar</button>
+  <details id="whatsapp-notice-history" hidden>
+    <summary>Avisos de pedido recentes</summary>
+    <ul id="whatsapp-notice-list"></ul>
+  </details>
+</section>
+</main>
+<script src="/whatsapp-connection.js" defer></script>
 <script>
 const $ = id => document.getElementById(id);
 const days = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];

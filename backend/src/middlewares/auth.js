@@ -2,12 +2,13 @@ const {context,resolveAssisted,auditAttempt}=require('../impersonation');
 const {tokenHash}=require('../security');
 const {roles,verify,verifyImpersonation,issue,InvalidToken,TTL}=require('../jwt');
 const {tenantMiddleware}=require('./tenant');
+const {identityMatchesHost,tenantSlugFromHost,isMasterHost}=require('../public-hosts');
 const authenticated=Symbol('apexhub-authenticated');
 function cookieToken(req,name){const part=(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));const value=part?.slice(name.length+1);return /^[a-f0-9]{64}$/.test(value||'')?value:null;}
 async function resolveIdentity(db,req,scope,config){
  const authorization=req.headers.authorization;let claims=null,sid,credential;
- if(authorization!==undefined){if(typeof authorization!=='string'||!/^Bearer [A-Za-z0-9_.-]+$/i.test(authorization))throw new InvalidToken();try{claims=verify(config,authorization.slice(7),scope);}catch(e){if(scope!=='tenant')throw e;const assisted=verifyImpersonation(config,authorization.slice(7));return resolveAssisted(db,req,{claims:assisted});}sid=claims.sid;credential='bearer';}
- else {if(scope==='tenant'){const marker=context(req);if(marker)return resolveAssisted(db,req,{marker});}const raw=cookieToken(req,scope==='master'?'apex_master_session':'delivery_session');if(!raw)return null;sid=tokenHash(raw);credential='cookie';}
+ if(authorization!==undefined){if(typeof authorization!=='string'||!/^Bearer [A-Za-z0-9_.-]+$/i.test(authorization))throw new InvalidToken();try{claims=verify(config,authorization.slice(7),scope);}catch(e){if(scope!=='tenant')throw e;const assisted=verifyImpersonation(config,authorization.slice(7));const identity=await resolveAssisted(db,req,{claims:assisted});return identity&&identityMatchesHost(req,'tenant',identity.user)?identity:null;}sid=claims.sid;credential='bearer';}
+ else {if(scope==='tenant'){const marker=context(req);if(marker){const identity=await resolveAssisted(db,req,{marker});return identity&&identityMatchesHost(req,'tenant',identity.user)?identity:null;}}const raw=cookieToken(req,scope==='master'?'apex_master_session':'delivery_session');if(!raw)return null;sid=tokenHash(raw);credential='cookie';}
  let user;
  if(scope==='tenant'){
   const [rows]=await db.execute(`SELECT u.id, u.company_id, u.name, u.email, u.role, c.name AS company_name, c.slug
@@ -17,6 +18,7 @@ async function resolveIdentity(db,req,scope,config){
   const [[row]]=await db.execute('SELECT a.id,a.name,a.email FROM platform_sessions s JOIN platform_admins a ON a.id=s.admin_id WHERE s.token_hash=? AND s.expires_at>UTC_TIMESTAMP() AND a.active=1',[sid]);user=row;
  }
  if(!user)return null;
+ if(!identityMatchesHost(req,scope,user))return null;
  const role=scope==='master'?'super_admin':roles[user.role],tenantId=scope==='master'?null:user.company_id;
  if(!role)return null;
  if(claims&&(claims.sub!==scope+':'+user.id||claims.role!==role||claims.tenant_id!==tenantId))throw new InvalidToken();

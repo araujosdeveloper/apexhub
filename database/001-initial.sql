@@ -27,6 +27,40 @@ CREATE TABLE IF NOT EXISTS subscriptions (
  trial_ends_at DATETIME NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY (company_id) REFERENCES companies(id)
 ) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS company_whatsapp_connections (
+ company_id INT UNSIGNED PRIMARY KEY,
+ waba_id VARCHAR(24) NOT NULL,
+ phone_number_id VARCHAR(24) NOT NULL UNIQUE,
+ display_phone VARCHAR(48) NOT NULL,
+ encrypted_token TEXT NOT NULL,
+ automation_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+ enabled_at DATETIME(6) NULL,
+ webhook_checked_at DATETIME(6) NULL,
+ connected_by BIGINT UNSIGNED NOT NULL,
+ connected_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS company_whatsapp_inbox (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id INT UNSIGNED NOT NULL,
+ phone_number_id VARCHAR(24) NOT NULL,
+ message_id VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ sender VARCHAR(20) NOT NULL,
+ message_type VARCHAR(32) NOT NULL,
+ body TEXT CHARACTER SET utf8mb4 NULL,
+ received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY whatsapp_inbox_message (company_id, phone_number_id, message_id),
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS subscription_plan_requests (
+ company_id INT UNSIGNED PRIMARY KEY, plan_code ENUM('essencial','pro') NOT NULL,
+ status ENUM('pending','accepted','declined') NOT NULL DEFAULT 'pending',
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS categories (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id INT UNSIGNED NOT NULL,
  name VARCHAR(120) NOT NULL, sort_order INT NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -50,7 +84,7 @@ CREATE TABLE IF NOT EXISTS product_options (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,tenant_id INT UNSIGNED NOT NULL,product_id INT UNSIGNED NOT NULL,
  option_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,group_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
  name VARCHAR(120) NOT NULL,additional_price DECIMAL(10,2) NOT NULL,max_quantity INT UNSIGNED NOT NULL DEFAULT 1,is_active BOOLEAN NOT NULL DEFAULT TRUE,
- created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY menu_option_key(tenant_id,product_id,option_key),CHECK(additional_price>=0),CHECK(max_quantity=1),
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY menu_option_key(tenant_id,product_id,option_key),CHECK(additional_price>=0),CONSTRAINT product_options_quantity_range CHECK(max_quantity BETWEEN 1 AND 20),
  FOREIGN KEY(tenant_id,product_id) REFERENCES products(company_id,id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS customers (
@@ -88,7 +122,7 @@ CREATE TABLE IF NOT EXISTS orders (
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS order_items (
  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, order_id INT UNSIGNED NOT NULL, product_id INT UNSIGNED NOT NULL,
- product_name VARCHAR(160) NOT NULL, quantity INT UNSIGNED NOT NULL, addons_snapshot JSON NULL,
+ product_name VARCHAR(160) NOT NULL, quantity INT UNSIGNED NOT NULL, item_notes VARCHAR(500) NOT NULL DEFAULT '', addons_snapshot JSON NULL,
  unit_price DECIMAL(10,2) NOT NULL, total_price DECIMAL(10,2) NOT NULL,
  CHECK (quantity > 0), CHECK (unit_price >= 0), CHECK (total_price >= 0),
  FOREIGN KEY (order_id) REFERENCES orders(id), FOREIGN KEY (product_id) REFERENCES products(id)
@@ -136,4 +170,70 @@ CREATE TABLE IF NOT EXISTS store_images (
  company_id INT UNSIGNED NOT NULL,kind ENUM('banner','logo') NOT NULL,content_type VARCHAR(32) NOT NULL,
  content MEDIUMBLOB NOT NULL,digest CHAR(64) NOT NULL,PRIMARY KEY(company_id,kind),
  FOREIGN KEY(company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS whatsapp_initial_replies (
+ inbox_id BIGINT UNSIGNED PRIMARY KEY,
+ state ENUM('uncertain','accepted','rejected') NOT NULL,
+ provider_message_id VARCHAR(255) NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (inbox_id) REFERENCES company_whatsapp_inbox(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS whatsapp_carts (
+ company_id INT UNSIGNED NOT NULL,
+ phone_number_id VARCHAR(24) NOT NULL,
+ sender VARCHAR(20) NOT NULL,
+ items JSON NOT NULL,
+ quote JSON NULL,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ PRIMARY KEY (company_id, phone_number_id, sender),
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS whatsapp_handoffs (
+ company_id INT UNSIGNED NOT NULL,
+ phone_number_id VARCHAR(24) NOT NULL,
+ sender VARCHAR(20) NOT NULL,
+ state ENUM('waiting','human','bot') NOT NULL,
+ actor_id BIGINT UNSIGNED NULL,
+ skip_through BIGINT UNSIGNED NOT NULL DEFAULT 0,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ PRIMARY KEY (company_id, phone_number_id, sender),
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS whatsapp_human_replies (
+ company_id INT UNSIGNED NOT NULL,
+ phone_number_id VARCHAR(24) NOT NULL,
+ sender VARCHAR(20) NOT NULL,
+ request_key CHAR(36) NOT NULL,
+ actor_id BIGINT UNSIGNED NOT NULL,
+ body TEXT CHARACTER SET utf8mb4 NOT NULL,
+ state ENUM('uncertain','accepted','rejected') NOT NULL,
+ provider_message_id VARCHAR(255) NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY (company_id, phone_number_id, sender, request_key),
+ FOREIGN KEY (company_id, phone_number_id, sender)
+   REFERENCES whatsapp_handoffs(company_id, phone_number_id, sender) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS whatsapp_order_notices (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id INT UNSIGNED NOT NULL,
+ order_id BIGINT UNSIGNED NOT NULL,
+ kind ENUM('consent','preparing','ready','delivering','cancelled') NOT NULL,
+ state ENUM('queued','uncertain','accepted','delivered','rejected','suppressed') NOT NULL,
+ phone_number_id VARCHAR(24) NULL,
+ provider_message_id VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY whatsapp_notice_event (company_id, order_id, kind),
+ KEY whatsapp_notice_queue (state, id),
+ KEY whatsapp_notice_provider (phone_number_id, provider_message_id),
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS whatsapp_notice_optouts (
+ company_id INT UNSIGNED NOT NULL,
+ sender VARCHAR(20) NOT NULL,
+ PRIMARY KEY (company_id, sender),
+ FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

@@ -1,5 +1,5 @@
 [Unit]
-Description=Backup diario Delivery SaaS às 04:15 UTC
+Description=Backup diario Apex Delivery às 04:15 UTC
 
 [Timer]
 OnCalendar=*-*-* 04:15:00 UTC

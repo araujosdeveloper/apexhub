@@ -17,7 +17,7 @@ function productInput(body){
  try{
   if(body.options!==undefined&&body.addon_groups!==undefined)throw Error('Informe options ou addon_groups, não ambos.');
   if(body.options!==undefined){if(!Array.isArray(body.options)||body.options.length>20)throw Error('Cadastre até 20 opções simples.');
-   groups=body.options.length?[{id:'menu_extras',name:'Complementos',min:0,max:body.options.length,options:body.options.map((o,i)=>{if(!o||o.max_quantity!==undefined&&o.max_quantity!==1)throw Error('O checkout atual permite uma unidade de cada opcional por item (max_quantity=1).');return {id:'menu_option_'+(i+1),name:o.name,price:o.additional_price,active:o.is_active??true};})}]:[];
+   groups=body.options.length?[{id:'menu_extras',name:'Complementos',min:0,max:Math.min(20,body.options.reduce((sum,o)=>sum+(Number.isSafeInteger(o?.max_quantity)?o.max_quantity:1),0)),options:body.options.map((o,i)=>{if(!o)throw Error('Opcional inválido.');return {id:'menu_option_'+(i+1),name:o.name,price:o.additional_price,active:o.is_active??true,...(o.max_quantity!==undefined?{max_quantity:o.max_quantity}:{})};})}]:[];
   }else groups=body.addon_groups??[];
   groups=validateGroups(groups);
  }catch(e){throw new AdminError(400,e.message);}

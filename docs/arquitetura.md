@@ -10,7 +10,7 @@ Decisão inicial: monólito modular Node.js/Express + MySQL 8. Manter a tecnolog
 
 ## Primeira entrega: fundação
 
-- Cadastro transacional de restaurante, proprietário e assinatura em teste de 14 dias.
+- Cadastro transacional de restaurante, proprietário e assinatura em teste de 30 dias, com planos Essencial e Pro e acesso controlado por recurso.
 - Senhas com scrypt e salt aleatório; sessão opaca, cookie HttpOnly/SameSite, hash do token no banco e expiração em sete dias.
 - Identidade do restaurante obtida da sessão nas rotas administrativas. Os identificadores fornecidos pelo navegador não definem a empresa autorizada.
 - Perfis owner, manager e operator. Proprietário e gerente administram o cardápio; operador acompanha pedidos. A interface de convite e gestão da equipe ainda não foi feita.
@@ -23,7 +23,7 @@ O fluxo do cliente é: cadastro → painel → cardápio → categoria → produ
 
 ## Limites desta entrega
 
-O status de assinatura é informativo. Não existe cobrança, confirmação de pagamento, bloqueio por vencimento ou integração automática com WhatsApp. O encaminhamento ao WhatsApp abre uma mensagem para envio manual. Não informa que um pagamento foi efetivado.
+Trial expirado e recursos avançados são bloqueados no backend. A contratação registra uma solicitação para ativação manual pelo Master; cobrança recorrente e confirmação de pagamento ainda não estão integradas. O encaminhamento ao WhatsApp abre uma mensagem para envio manual. Não informa que um pagamento foi efetivado.
 
 O checkout exige Idempotency-Key. Uma chave única por empresa e o hash normalizado dos dados são gravados na mesma transação do pedido. Reenvios com a mesma chave e conteúdo retornam o pedido original; conteúdo diferente retorna 409. O cliente mantém carrinho e chave em sessionStorage para permitir reenvio após falha ou recarga. A retenção dessas chaves ainda não tem rotina de expurgo; apagá-las elimina a proteção dos reenvios antigos. O carrinho permite diminuir e remover produtos. A loja exige HTTPS ou localhost para usar a API criptográfica do navegador.
 

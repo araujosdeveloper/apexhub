@@ -66,9 +66,12 @@ test('gestor preserva adicionais e distingue entrega de retirada nas ações', a
   const patch = ui.calls.find(call => call.options.method === 'PATCH'); assert.deepEqual(JSON.parse(patch.options.body), { status: 'delivering', expected_status: 'ready' });
 });
 test('cozinha destaca itens e não mostra telefone, endereço ou total; impressão é manual', async () => {
-  const ui = await page({ kitchen: true }); const markup = ui.nodes.get('orders-board').innerHTML;
+  const ui = await page({ kitchen: true, orders: [makeOrder(12, 'ready')] }); const markup = ui.nodes.get('orders-board').innerHTML;
   assert.match(markup, /Queijo/); assert.doesNotMatch(markup, /11999999999|Rua A|Total:/);
-  assert.equal(ui.run("allowedActions({...state.orders[0], status:'ready'}).length"), 0);
+  assert.deepEqual(Array.from(ui.run("allowedActions({...state.orders[0], status:'ready'})")), ['completed']);
+  assert.match(markup, /Concluir \/ Entregue/);
+  await ui.run("updateStatus(12, 'completed')");
+  const patch = ui.calls.find(call => call.options.method === 'PATCH'); assert.deepEqual(JSON.parse(patch.options.body), { status: 'completed', expected_status: 'ready' });
   ui.run('printOrder(12)'); assert.equal(ui.prints(), 1); assert.match(ui.nodes.get('print-ticket').innerHTML, /Queijo/); assert.doesNotMatch(ui.nodes.get('print-ticket').innerHTML, /11999999999|Rua A|Total:/);
 });
 test('dados do cliente são escapados e pedido antigo sem itens não pode iniciar produção', async () => {
@@ -118,5 +121,24 @@ test('gestor e via de entrega exibem cupom e desconto; cozinha preserva foco na 
   const kitchen = await page({ kitchen: true, orders: [order] }); assert.doesNotMatch(kitchen.nodes.get('orders-board').innerHTML, /Cupom TESTE/);
 });
 test('lista de pedidos é padrão e mantém quadro, ações e detalhes disponíveis',async()=>{
- const ui=await page();assert.match(ui.nodes.get('orders-board').innerHTML,/order-list-table/);assert.match(ui.nodes.get('orders-board').innerHTML,/data-action="details"/);assert.match(ui.nodes.get('orders-board').innerHTML,/Aceitar e preparar/);ui.run("orderLayout='board';state.fingerprint='';render()");assert.doesNotMatch(ui.nodes.get('orders-board').innerHTML,/order-list-table/);assert.match(ui.nodes.get('orders-board').innerHTML,/stage-heading/);
+ const ui=await page();assert.match(ui.nodes.get('orders-board').innerHTML,/order-list-table/);assert.match(ui.nodes.get('orders-board').innerHTML,/data-action="details"/);assert.match(ui.nodes.get('orders-board').innerHTML,/Iniciar preparo/);ui.run("orderLayout='board';state.fingerprint='';render()");assert.doesNotMatch(ui.nodes.get('orders-board').innerHTML,/order-list-table/);assert.match(ui.nodes.get('orders-board').innerHTML,/stage-heading/);
+});
+
+test('observação por item aparece escapada na cozinha e no comprovante', async () => {
+ const order = makeOrder();
+ order.items[0].item_notes = 'Sem milho <img src=x>';
+ const p = await page({ kitchen: true, orders: [order] });
+ const rendered = p.run('itemsHtml(state.orders[0])');
+ assert.match(rendered, /Sem milho &lt;img/);
+ assert.doesNotMatch(rendered, /<img src=x>/);
+ p.run('printOrder(12)');
+ assert.match(p.nodes.get('print-ticket').innerHTML, /Sem milho &lt;img/);
+});
+
+
+test('cozinha e impressão exibem a quantidade histórica de cada adicional', async () => {
+ const order=makeOrder();order.items[0].addons_snapshot[0].quantity=2;
+ const p=await page({kitchen:true,orders:[order]});
+ assert.match(p.run('itemsHtml(state.orders[0])'),/2× Queijo/);
+ p.run('printOrder(12)');assert.match(p.nodes.get('print-ticket').innerHTML,/2× Queijo/);
 });

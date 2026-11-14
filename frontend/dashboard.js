@@ -1,6 +1,7 @@
 'use strict';
-/* ApexHub: rendering separado do acesso à API para facilitar evolução e testes. */
+/* Apex Delivery: rendering separado do acesso à API para facilitar evolução e testes. */
 const $ = id => document.getElementById(id);
+const storeUrl = slug => ['apexdelivery.com.br','www.apexdelivery.com.br'].includes((typeof location.hostname==='string'?location.hostname.toLowerCase():'')) && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? `https://${slug}.apexdelivery.com.br/` : '/?loja='+encodeURIComponent(slug);
 const statusLabels = {pending:'Novo',preparing:'Em preparo',ready:'Pronto',delivering:'Em entrega',completed:'Concluído',cancelled:'Cancelado'};
 const roleLabels = {owner:'Proprietário',manager:'Gerente',operator:'Operador'};
 const state = {user:null, data:null, metric:'revenue', loading:false, authenticated:false, searchRevision:0, searchTimer:null, stream:null, queued:false};
@@ -216,7 +217,7 @@ async function initialize() {
     $('sidebar-store').textContent=user.company_name;
     const option=document.createElement('option'); option.value=String(user.company_id); option.textContent=user.company_name;
     $('store-select').replaceChildren(option); $('store-select').title='Estabelecimento vinculado à sua conta';
-    $('open-store').href='/?loja='+encodeURIComponent(user.slug); $('team-link').hidden=user.role!=='owner';
+    $('open-store').href=storeUrl(user.slug); $('team-link').hidden=user.role!=='owner';
     $('greeting').textContent='Olá, '+user.name.trim().split(/\s+/)[0]+'. Aqui está o panorama da sua operação.';
     await load(); connectStream();
     if(state.authenticated) setInterval(()=>{if(!document.hidden)load();},30000);

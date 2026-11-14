@@ -7,7 +7,7 @@ automação configurada com OnSuccess=delivery-live-drive.service. Backup inicia
 fora da VPS. A primeira execução automática futura ainda precisa ser acompanhada.
 
 A skill Google Drive foi lida e a integração conectada foi consultada para uma
-pasta Delivery SaaS Backups; não houve resultado. Não foi transferido nenhum dump
+pasta Apex Delivery Backups; não houve resultado. Não foi transferido nenhum dump
 pela integração. A ferramenta não fornece credenciais OAuth nem agendamento ao
 servidor; os envios automáticos usam rclone com autorização própria da VPS.
 

@@ -1,6 +1,6 @@
 # Versionamento no GitHub
 
-O repositório deve conter fontes, testes, migrações, exemplos de configuração e scripts de operação. Recomenda-se um repositório privado para o ApexHub.
+O repositório deve conter fontes, testes, migrações, exemplos de configuração e scripts de operação. Recomenda-se um repositório privado para o Apex Delivery.
 
 Não enviar `.env`, credenciais/chaves, configurações pessoais de ferramentas, backups, relatórios de produção, dependências instaladas, estado dos containers ou ponteiros/rotas da publicação atual. O `.gitignore` cobre esses arquivos. A documentação técnica inclui referências operacionais à VPS e não substitui o backup dos dados.
 

@@ -7,7 +7,7 @@ const expected = {
  products: ['id', 'company_id', 'category_id', 'name', 'description', 'price', 'active'],
  customers: ['id', 'company_id', 'name', 'phone', 'address_street', 'address_number', 'address_neighborhood'],
  orders: ['id', 'company_id', 'customer_id', 'total_amount', 'status', 'payment_method', 'notes', 'snapshot_source', 'customer_name', 'customer_phone', 'address_street', 'address_number', 'address_neighborhood', 'created_at', 'fulfillment_method', 'delivery_fee', 'fulfillment_address', 'estimated_minutes', 'coupon_code', 'discount_amount', 'coupon_snapshot', 'customer_phone_key'],
- order_items: ['id', 'order_id', 'product_id', 'product_name', 'quantity', 'unit_price', 'total_price', 'addons_snapshot'],
+ order_items: ['id', 'order_id', 'product_id', 'product_name', 'quantity', 'unit_price', 'total_price', 'addons_snapshot', 'item_notes'],
  users: ['id', 'company_id', 'name', 'email', 'password_hash', 'role', 'active'],
  sessions: ['token_hash', 'user_id', 'expires_at'],
  subscriptions: ['id', 'company_id', 'plan_code', 'status', 'trial_ends_at'],

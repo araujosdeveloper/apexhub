@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cardápio Digital</title>
+    <title>Apex Delivery · Cardápio Digital</title>
+    <meta name="description" content="Consulte o cardápio digital e faça seu pedido com a Apex Delivery.">
     <meta name="color-scheme" content="light">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/apex-tokens.css">
     <link rel="stylesheet" href="/menu-theme.css">
     <link rel="stylesheet" href="/menu-mobile.css">
@@ -13,7 +15,7 @@
 <body class="apex-menu pb-28">
 
     <!-- Cabeçalho da Loja -->
-    <div class="store-cover" id="store-cover"><img id="store-cover-image" alt="" hidden decoding="async" fetchpriority="high" referrerpolicy="no-referrer"><p class="menu-brand">APEXHUB · CARDÁPIO DIGITAL</p></div>
+    <div class="store-cover" id="store-cover"><img id="store-cover-image" alt="" hidden decoding="async" fetchpriority="high" referrerpolicy="no-referrer"><p class="menu-brand">APEX DELIVERY · CARDÁPIO DIGITAL</p></div>
     <header id="header" class="store-summary"><div class="store-summary-inner"><div class="store-avatar"><span id="store-initials" aria-hidden="true">A</span><img id="store-logo" alt="Logo do estabelecimento" hidden decoding="async" referrerpolicy="no-referrer"></div><div class="store-identity"><h1 id="store-name" class="text-2xl font-bold">Carregando cardápio...</h1><div class="menu-header-meta"><p id="store-status" class="menu-store-status text-sm mt-1">Aguarde um momento</p><p id="store-estimate" class="menu-estimate"></p></div></div><button type="button" onclick="location.reload()" class="store-refresh">↻ Atualizar disponibilidade</button></div></header>
     <div class="menu-search" role="search"><label class="sr-only" for="menu-search">Buscar produtos no cardápio</label><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="menu-search" type="search" maxlength="80" placeholder="O que você quer pedir hoje?" autocomplete="off" oninput="searchMenu(this.value)"><button id="menu-search-clear" type="button" onclick="clearMenuSearch()" aria-label="Limpar pesquisa" hidden>×</button></div>
     <nav id="menu-categories" class="menu-category-tabs" aria-label="Categorias do cardápio"></nav>
@@ -94,6 +96,10 @@
                 <p class="text-xs text-secondary mt-2">A escolha informa como você pagará à loja. Não há cobrança online neste checkout.</p>
             </div>
 
+            <label id="whatsapp-status-offer" hidden>
+                <input id="whatsapp-status-consent" type="checkbox">
+                Quero receber avisos deste pedido no WhatsApp. Posso cancelar enviando SAIR.
+            </label>
             <button id="send-order" onclick="sendOrder()" class="w-full action-primary text-primary py-3 rounded-xl font-bold hover:action-primary transition text-center">
                 Confirmar pedido
             </button>
@@ -103,7 +109,7 @@
     <div id="addons-modal" role="dialog" aria-modal="true" aria-labelledby="addons-title" class="fixed inset-0 bg-black bg-opacity-50 hidden flex justify-center items-center p-4">
         <div class="surface-card w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3"><h2 id="addons-title" class="text-xl font-bold"></h2><button type="button" onclick="closeAddons()" aria-label="Fechar adicionais" class="text-xl px-3">×</button></div>
-            <div id="addons-options"></div><p id="addons-error" role="status" aria-live="polite" class="text-danger my-3"></p>
+            <div id="addons-options"></div><label class="block text-sm mt-3" for="item-notes">Observação para este preparo</label><textarea id="item-notes" maxlength="500" rows="2" class="w-full border rounded p-2" placeholder="Ex.: sem cebola"></textarea><p id="addons-error" role="status" aria-live="polite" class="text-danger my-3"></p>
             <button id="confirm-addons" type="button" onclick="confirmAddons()" class="w-full action-primary text-primary py-3 rounded-xl font-bold">Adicionar ao carrinho</button>
         </div>
     </div>
@@ -112,10 +118,16 @@
     <footer id="store-footer" class="store-footer" aria-labelledby="store-footer-name"><div class="store-footer-heading"><p>CONHEÇA NOSSA LOJA</p><h2 id="store-footer-name">Informações do estabelecimento</h2></div><div class="store-info-grid">
 <section class="store-info-card" aria-labelledby="store-contact-title"><h2 id="store-contact-title">Fale com a gente</h2><p><a id="store-phone" hidden></a><span id="store-phone-empty">Telefone não informado.</span></p><p id="store-email-row" hidden><a id="store-email"></a></p><div id="store-social-links" class="store-social-links" hidden><a id="store-instagram" target="_blank" rel="noopener noreferrer" hidden>Instagram ↗</a><a id="store-facebook" target="_blank" rel="noopener noreferrer" hidden>Facebook ↗</a></div><p id="store-public-notice" class="store-public-notice" hidden></p></section>
 <section class="store-info-card" aria-labelledby="store-hours-title"><h2 id="store-hours-title">Horários de atendimento</h2><details class="store-hours-details" open><summary>Consultar funcionamento</summary><p id="store-hours"></p></details></section>
-<section class="store-info-card store-location" aria-labelledby="store-location-title"><div class="store-map-art" aria-hidden="true"><svg viewBox="0 0 360 160" fill="none"><path d="M-10 45h125l45 65h220M50-20l50 200M265-20l-35 200" stroke="#fff" stroke-width="22"/><path d="M-10 45h125l45 65h220M50-20l50 200M265-20l-35 200" stroke="#D5DDE3" stroke-width="2"/><path d="M180 38c-20 0-33 14-33 32 0 25 33 51 33 51s33-26 33-51c0-18-13-32-33-32Z" fill="#FF7F00"/><circle cx="180" cy="70" r="11" fill="white"/></svg></div><div class="store-location-text"><h2 id="store-location-title">Onde estamos</h2><address id="store-address">Endereço não informado.</address><a id="store-map-link" target="_blank" rel="noopener noreferrer" hidden>Ver localização no mapa →</a></div></section></div><div class="store-footer-bottom"><span>ApexHub · Cardápio digital</span><span>Contato e endereço informados pelo estabelecimento.</span></div></footer>
+<section class="store-info-card store-location" aria-labelledby="store-location-title"><div class="store-map-art" aria-hidden="true"><svg viewBox="0 0 360 160" fill="none"><path d="M-10 45h125l45 65h220M50-20l50 200M265-20l-35 200" stroke="#fff" stroke-width="22"/><path d="M-10 45h125l45 65h220M50-20l50 200M265-20l-35 200" stroke="#D5DDE3" stroke-width="2"/><path d="M180 38c-20 0-33 14-33 32 0 25 33 51 33 51s33-26 33-51c0-18-13-32-33-32Z" fill="#FF7F00"/><circle cx="180" cy="70" r="11" fill="white"/></svg></div><div class="store-location-text"><h2 id="store-location-title">Onde estamos</h2><address id="store-address">Endereço não informado.</address><a id="store-map-link" target="_blank" rel="noopener noreferrer" hidden>Ver localização no mapa →</a></div></section></div><div class="store-footer-bottom"><span>Apex Delivery · Cardápio digital</span><span>Contato e endereço informados pelo estabelecimento.</span></div></footer>
     <script src="/store-header.js"></script>
     <script>
-        const slug = new URLSearchParams(location.search).get('loja');
+        const configuredDomain = 'apexdelivery.com.br';
+        const querySlug = new URLSearchParams(location.search).get('loja');
+        const hostname = String(location.hostname || '').toLowerCase().replace(/\.$/, '');
+        const suffix = '.' + configuredDomain;
+        const subdomainSlug = hostname.endsWith(suffix) ? hostname.slice(0, -suffix.length) : '';
+        const validSlug = value => typeof value === 'string' && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(value) && !['www','app','admin','master','api'].includes(value);
+        const slug = validSlug(subdomainSlug) ? subdomainSlug : (validSlug(querySlug) ? querySlug : null);
         let sendingOrder = false;
         let checkoutOpen = false;
         let pendingAttempt = null;
@@ -142,6 +154,8 @@
                 storeData = await response.json();
 
                 companyId = storeData.company.id;
+                const noticeOffer = document.getElementById('whatsapp-status-offer');
+                if (noticeOffer) noticeOffer.hidden = storeData.whatsapp_status_available !== true;
                 companyPhone = storeData.company.whatsapp_phone;
                 const saved = storageGet(cartStorageKey);
                 let removedItems = false;
@@ -150,7 +164,7 @@
                     if (!product || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) { removedItems = true; return []; }
                     try {
                         if (item.addon_version && item.addon_version !== product.addon_version) throw new Error('Adicionais alterados');
-                        const restored = customizedItem(product, item.option_ids || []);
+                        const restored = customizedItem(product, item.option_ids || [], item.notes || '', item.option_quantities || {});
                         return [{ ...restored, quantity: item.quantity }];
                     } catch { removedItems = true; return []; }
                 });
@@ -263,7 +277,7 @@
         function couponContext() {
             const selection = checkoutSelection();
             return JSON.stringify({ companyId, code: document.getElementById('coupon-code').value.trim().toUpperCase(), phone: document.getElementById('customer-phone').value.trim(), method: selection.method, neighborhood: selection.neighborhood, fee: selection.fee,
-                items: cart.map(item => [item.id, item.quantity, item.option_ids || [], item.addon_version || 0, item.price]) });
+                items: cart.map(item => [item.id, item.quantity, item.option_ids || [], item.addon_version || 0, item.option_quantities || null, item.notes || '', item.price]) });
         }
         function updateCheckoutTotal() {
             const selection = checkoutSelection(), signature = couponContext();
@@ -281,6 +295,7 @@
             document.getElementById('apply-coupon').disabled = sendingOrder || applyingCoupon || !cart.length;
             document.getElementById('remove-coupon').disabled = sendingOrder;
             for (const id of ['customer-name','customer-phone','customer-street','customer-number','customer-neighborhood','delivery-zone','fulfillment-method','payment-method','coupon-code']) document.getElementById(id).disabled = sendingOrder;
+            (document.querySelectorAll?.('#cart-items-list input, #cart-items-list textarea') || []).forEach(input => { input.disabled = sendingOrder; });
         }
         function removeCoupon() {
             if (sendingOrder) return;
@@ -295,36 +310,49 @@
             const request = ++couponRequest, signature = couponContext(); applyingCoupon = true; updateCheckoutTotal();
             document.getElementById('coupon-message').textContent = 'Conferindo cupom…';
             try {
-                const response = await fetch('/api/coupons/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyId, coupon_code: code, phone, fulfillment_method: selection.method, neighborhood: selection.neighborhood, items: cart.map(({ id, quantity, option_ids, addon_version }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}) })) }) });
+                const response = await fetch('/api/public/coupons/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenant_id: companyId, code, phone, fulfillment_method: selection.method, neighborhood: selection.neighborhood, items: cart.map(({ id, quantity, option_ids, addon_version, notes, option_quantities }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}), ...(option_quantities ? { option_quantities } : {}) })) }) });
                 const result = await response.json();
                 if (request !== couponRequest) return;
                 if (signature !== couponContext()) throw new Error('O pedido mudou. Aplique o cupom novamente.');
-                if (!response.ok) throw new Error(result.error || 'Não foi possível aplicar o cupom.');
+                if (!response.ok || result.success !== true || !result.data) throw new Error(result.message || result.error || 'Não foi possível aplicar o cupom.');
+                const quote = result.data;
                 const subtotal = cart.reduce((sum, item) => sum + Math.round(Number(item.price) * 100) * item.quantity, 0);
-                if (Math.round(Number(result.subtotal_amount) * 100) !== subtotal || Number(result.delivery_fee) !== Number(selection.fee)) throw new Error('Os valores mudaram. Atualize o cardápio e confira o pedido.');
-                appliedCoupon = { ...result, code, signature }; storageSet(couponStorageKey, appliedCoupon);
+                if (Math.round(Number(quote.subtotal_amount) * 100) !== subtotal || Number(quote.delivery_fee) !== Number(selection.fee)) throw new Error('Os valores mudaram. Atualize o cardápio e confira o pedido.');
+                appliedCoupon = { ...quote, code, signature }; storageSet(couponStorageKey, appliedCoupon);
                 document.getElementById('coupon-message').textContent = 'Cupom aplicado. O limite de uso será conferido novamente ao confirmar.';
             } catch (error) { if (request === couponRequest) document.getElementById('coupon-message').textContent = error.message || 'Não foi possível conferir o cupom.'; }
             finally { if (request === couponRequest) { applyingCoupon = false; updateCheckoutTotal(); } }
         }
         document.getElementById('customer-phone').oninput = updateCheckoutTotal;
         let customization = null;
-        function customizedItem(product, ids = []) {
+        function customizedItem(product, ids = [], notes = '', counts = {}) {
+            if (typeof notes !== 'string' || notes.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(notes)) throw new Error('Use uma observação de até 500 caracteres.');
+            notes = notes.trim();
             const groups = product.addon_groups || [], selected = new Set(ids), options = [];
             if (!Array.isArray(ids) || selected.size !== ids.length) throw new Error('Seleção inválida.');
+            const entries = Object.entries(counts);
+            if (entries.some(([id, count]) => !selected.has(id) || !Number.isSafeInteger(count) || count < 1 || count > 20)) throw new Error('Quantidades de adicionais inválidas.');
+            const quantity = id => Object.hasOwn(counts, id) ? counts[id] : 1;
             for (const group of groups) {
                 const choices = group.options.filter(option => selected.has(option.id));
-                if (choices.length < group.min || choices.length > group.max) throw new Error(`Escolha de ${group.min} a ${group.max} opções em ${group.name}.`);
-                choices.forEach(option => { selected.delete(option.id); options.push({ ...option, group_name: group.name }); });
+                const count = choices.reduce((sum, option) => sum + quantity(option.id), 0);
+                if (count < group.min || count > group.max) throw new Error(`Escolha de ${group.min} a ${group.max} unidades em ${group.name}.`);
+                choices.forEach(option => {
+                    const count = quantity(option.id);
+                    if (count > (option.max_quantity || 1)) throw new Error('Quantidade excede o limite de ' + option.name + '.');
+                    selected.delete(option.id); options.push({ ...option, ...(count > 1 ? { quantity: count } : {}), group_name: group.name });
+                });
             }
             if (selected.size) throw new Error('Adicional indisponível.');
-            const cents = Math.round(Number(product.price) * 100) + options.reduce((sum, option) => sum + Math.round(Number(option.price) * 100), 0);
-            return { ...product, price: (cents / 100).toFixed(2), option_ids: [...ids].sort(), selected_options: options, addon_version: groups.length ? product.addon_version : 0 };
+            const cents = Math.round(Number(product.price) * 100) + options.reduce((sum, option) => sum + Math.round(Number(option.price) * 100) * (option.quantity || 1), 0);
+            const repeated = options.some(option => option.quantity > 1);
+            const option_quantities = Object.fromEntries([...ids].sort().map(id => [id, quantity(id)]));
+            return { ...product, ...(notes ? { notes } : {}), ...(repeated ? { option_quantities } : {}), price: (cents / 100).toFixed(2), option_ids: [...ids].sort(), selected_options: options, addon_version: groups.length ? product.addon_version : 0 };
         }
-        function addCustomizedItem(product, ids) {
+        function addCustomizedItem(product, ids, notes = '', counts = {}) {
             if (cart.filter(item => item.id === product.id).reduce((sum, item) => sum + item.quantity, 0) >= 99) throw new Error('Limite de 99 unidades por produto.');
-            const item = customizedItem(product, ids);
-            const existing = cart.find(other => other.id === product.id && JSON.stringify(other.option_ids || []) === JSON.stringify(item.option_ids));
+            const item = customizedItem(product, ids, notes, counts);
+            const existing = cart.find(other => other.id === product.id && JSON.stringify(other.option_ids || []) === JSON.stringify(item.option_ids) && (other.notes || '') === (item.notes || '') && JSON.stringify(other.option_quantities || null) === JSON.stringify(item.option_quantities || null));
             if (existing) existing.quantity++; else cart.push({ ...item, quantity: 1 });
             updateCartUI();
         }
@@ -333,9 +361,10 @@
             const product = storeData.products.find(p => p.id === productId);
             if (!product) return;
             if ((product.addon_groups || []).length) {
-                customization = { product, ids: new Set() };
+                customization = { product, ids: new Set(), quantities: new Map() };
+                document.getElementById('item-notes').value = '';
                 document.getElementById('addons-title').textContent = product.name;
-                document.getElementById('addons-options').innerHTML = product.addon_groups.map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-secondary">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max}</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span><input type="checkbox" onchange="toggleAddon('${option.id}')"> ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
+                document.getElementById('addons-options').innerHTML = product.addon_groups.map(group => `<fieldset class="border-t py-3"><legend class="font-bold">${escapeHtml(group.name)}</legend><p class="text-sm text-secondary">${group.min ? 'Obrigatório' : 'Opcional'} · Escolha de ${group.min} a ${group.max} unidades</p>${group.options.map(option => `<label class="flex justify-between gap-3 py-2"><span>${(option.max_quantity || 1) > 1 ? `<input type="number" class="w-16 border rounded px-2" min="0" max="${option.max_quantity}" step="1" value="0" aria-label="Quantidade de ${escapeHtml(option.name)}" onchange="this.value = setAddonQuantity('${option.id}', this.value)">` : `<input type="checkbox" onchange="toggleAddon('${option.id}')">`} ${escapeHtml(option.name)}</span><span>+ R$ ${Number(option.price).toFixed(2)}</span></label>`).join('')}</fieldset>`).join('');
                 document.getElementById('addons-error').textContent = '';
                 document.getElementById('confirm-addons').textContent = `Adicionar · a partir de R$ ${Number(product.price).toFixed(2)}`;
                 document.getElementById('addons-modal').classList.remove('hidden');
@@ -347,7 +376,22 @@
         function toggleAddon(id) {
             if (!customization) return;
             if (customization.ids.has(id)) customization.ids.delete(id); else customization.ids.add(id);
-            const cents = Math.round(Number(customization.product.price) * 100) + customization.product.addon_groups.flatMap(group => group.options).filter(option => customization.ids.has(option.id)).reduce((sum, option) => sum + Math.round(Number(option.price) * 100), 0);
+            updateAddonTotal();
+        }
+        function setAddonQuantity(id, value) {
+            if (!customization) return 0;
+            const option = customization.product.addon_groups.flatMap(group => group.options).find(option => option.id === id);
+            const count = typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
+            if (!option || !Number.isSafeInteger(count) || count < 0 || count > (option.max_quantity || 1)) {
+                document.getElementById('addons-error').textContent = 'Confira a quantidade e o limite do adicional.';
+                return customization.quantities.get(id) || 0;
+            }
+            if (count) { customization.ids.add(id); customization.quantities.set(id, count); }
+            else { customization.ids.delete(id); customization.quantities.delete(id); }
+            updateAddonTotal(); return count;
+        }
+        function updateAddonTotal() {
+            const cents = Math.round(Number(customization.product.price) * 100) + customization.product.addon_groups.flatMap(group => group.options).filter(option => customization.ids.has(option.id)).reduce((sum, option) => sum + Math.round(Number(option.price) * 100) * (customization.quantities.get(option.id) || 1), 0);
             document.getElementById('confirm-addons').textContent = `Adicionar · R$ ${(cents / 100).toFixed(2)}`;
             document.getElementById('addons-error').textContent = '';
         }
@@ -355,8 +399,24 @@
         document.addEventListener?.('keydown', event => { if (event.key === 'Escape' && customization) closeAddons(); });
         function confirmAddons() {
             if (!customization || sendingOrder) return;
-            try { addCustomizedItem(customization.product, [...customization.ids]); closeAddons(); }
+            try { addCustomizedItem(customization.product, [...customization.ids], document.getElementById('item-notes').value, Object.fromEntries(customization.quantities)); closeAddons(); }
             catch (error) { document.getElementById('addons-error').textContent = error.message; }
+        }
+        function updateItemNotes(index, value) {
+            if (sendingOrder || !cart[index]) return;
+            try {
+                const item = customizedItem(storeData.products.find(product => product.id === cart[index].id), cart[index].option_ids || [], value, cart[index].option_quantities || {});
+                cart[index] = { ...item, quantity: cart[index].quantity };
+                updateCartUI();
+            } catch (error) { document.getElementById('cart-notice').textContent = error.message; }
+        }
+        function splitCartLineForNotes(index) {
+            const item = cart[index];
+            if (sendingOrder || !item || item.quantity < 2) return;
+            item.quantity--;
+            cart.splice(index + 1, 0, { ...item, quantity: 1 });
+            updateCartUI();
+            document.getElementById('cart-note-' + (index + 1))?.focus();
         }
         function changeQuantity(productId, delta) { changeQuantityByIndex(cart.findIndex(item => item.id === productId), delta); }
         function changeQuantityByIndex(index, delta) {
@@ -370,7 +430,7 @@
         }
 
         function updateCartUI() {
-            storageSet(cartStorageKey, cart.map(({ id, quantity, option_ids, addon_version }) => ({ id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}) })));
+            storageSet(cartStorageKey, cart.map(({ id, quantity, option_ids, addon_version, notes, option_quantities }) => ({ id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}), ...(option_quantities ? { option_quantities } : {}) })));
             renderSuggestions();
             if (checkoutOpen && cart.length) openCheckout();
             const cartBar = document.getElementById('cart-bar');
@@ -399,7 +459,9 @@
                 listContainer.innerHTML += `
                     <div class="flex justify-between items-center py-2">
                         <div>
-                            <p class="font-bold text-sm">${escapeHtml(item.name)}</p><p class="text-xs text-secondary">${(item.selected_options || []).map(option => escapeHtml(option.name) + (Number(option.price) ? " (+ R$ " + Number(option.price).toFixed(2) + ")" : "")).join(", ")}</p>
+                            <p class="font-bold text-sm">${escapeHtml(item.name)}</p><p class="text-xs text-secondary">${(item.selected_options || []).map(option => ((option.quantity || 1) > 1 ? option.quantity + '× ' : '') + escapeHtml(option.name) + (Number(option.price) ? " (+ R$ " + Number(option.price).toFixed(2) + ")" : "")).join(", ")}</p>
+                            <label class="block text-sm" for="cart-note-${index}">Observação deste item</label><textarea id="cart-note-${index}" maxlength="500" rows="2" class="w-full border rounded p-2" onchange="updateItemNotes(${index}, this.value)">${escapeHtml(item.notes || '')}</textarea><p class="text-xs text-secondary">Vale para todas as unidades desta linha. Adicione novamente para um preparo diferente.</p>
+                            ${item.quantity > 1 ? `<button type="button" class="text-sm underline" onclick="splitCartLineForNotes(${index})">Separar 1 unidade para outro preparo</button>` : ''}
                             <p class="text-xs text-secondary">Qtd: ${item.quantity} x R$ ${Number(item.price).toFixed(2)}</p>
                             <div class="flex items-center gap-3 mt-2">
                                 <button type="button" onclick="changeQuantityByIndex(${index}, -1)" aria-label="Diminuir quantidade de ${escapeHtml(item.name)}" class="border rounded px-3 py-1">−</button>
@@ -443,11 +505,15 @@
             const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
             const orderPayload = {
-                company_id: companyId,
+                tenant_id: companyId,
                 customer: { name, phone, street, number, neighborhood },
-                items: cart.map(({ id, quantity, option_ids, addon_version }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}) })),
+                items: cart.map(({ id, quantity, option_ids, addon_version, notes, option_quantities }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}), ...(option_quantities ? { option_quantities } : {}) })),
                 payment_method: payment
             };
+            const noticeOptIn = document.getElementById('whatsapp-status-consent');
+            if (noticeOptIn?.checked && !document.getElementById('whatsapp-status-offer').hidden) {
+                orderPayload.whatsapp_status_consent = true;
+            }
             // Conserva o conteúdo dos reenvios de delivery gratuitos anteriores a esta atualização.
             if (selection.method === 'pickup') orderPayload.fulfillment_method = 'pickup';
             if (Number(selection.fee) > 0) orderPayload.delivery_fee = selection.fee;
@@ -501,6 +567,7 @@
                     let subtotal = item.price * item.quantity;
                     message += `- ${item.quantity}x ${item.name} (R$ ${subtotal.toFixed(2)})\n`;
                     (item.selected_options || []).forEach(option => { message += `  + ${option.group_name}: ${option.name} (R$ ${Number(option.price).toFixed(2)} por unidade)\n`; });
+                    if (item.notes) message += `  Observação: ${item.notes}\n`;
                 });
 
                 if (result.coupon_code) message += `Cupom ${result.coupon_code}: - R$ ${Number(result.discount_amount).toFixed(2)}\n`;

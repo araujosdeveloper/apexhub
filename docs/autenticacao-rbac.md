@@ -1,4 +1,4 @@
-# Autenticação, RBAC e isolamento ApexHub
+# Autenticação, RBAC e isolamento Apex Delivery
 
 JWT, RBAC e isolamento multi-tenant publicados em 05/11/2026 às 19:04 UTC. STATUS=PUBLICADO e ponteiro latest-update confirmados em `reports/update-20261105T190222Z-288608`; backup final `backups/live/live-20261105T190408Z-293998`. Integração MySQL real aprovada em `reports/mysql-validation-20261105T190304Z-290916.log`, incluindo emissão JWT, claims, tenant, IDOR, perfis, revogação e suspensão. Ensaio da cópia, preservação dos dados, configuração das chaves, canário e verificações HTTP aprovados. Nenhuma migração SQL aplicada; dados anteriores preservados. Conferência manual dos logins pelo responsável ainda não confirmada.
 
