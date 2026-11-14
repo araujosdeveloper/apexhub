@@ -29,3 +29,12 @@ no domínio público é `/api/webhooks/whatsapp`. A inscrição da conta no camp
 `messages` permite testar a recepção. O webhook valida a assinatura sobre o
 corpo original e só grava mensagens de números vinculados a lojas elegíveis.
 As mensagens ficam na caixa de entrada persistente para processamento posterior.
+
+Para testar a resposta inicial, configure `WHATSAPP_REPLY_PILOT_COMPANY_ID`
+e `WHATSAPP_REPLY_PILOT_SENDER` em `.env.whatsapp` e recrie a aplicação.
+Use o identificador interno da loja e o telefone autorizado, com código
+do país e somente dígitos. Do telefone autorizado, envie “cardápio” ao
+número vinculado à loja. O Apex responde com o link do cardápio da loja.
+A aceitação da mensagem pela Meta é registrada separadamente do recebimento
+no aparelho. Em caso de resultado incerto, confira o aparelho antes de um
+novo teste. Para desligar o piloto, remova as duas variáveis e recrie a aplicação.
