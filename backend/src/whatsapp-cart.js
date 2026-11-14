@@ -1,11 +1,12 @@
 'use strict';
 
+const { parseCashAmount, cashChangeNote } = require('./cash-change');
 const { randomUUID } = require('node:crypto');
 const { normalizeLines, publicProduct } = require('./addons');
 const { priceCart } = require('./cart-pricing');
 const { loadOperations, availability, quoteDelivery } = require('./operations');
 
-const HELP = 'Use PRODUTOS, OPÇÕES código, ADICIONAR código quantidade | extra:quantidade | observação, REMOVER linha, CARRINHO ou LIMPAR. Para finalizar: RETIRADA nome | Pix, Cartão ou Dinheiro; ou ENTREGA nome | rua | número | bairro | pagamento.';
+const HELP = 'Use PRODUTOS, OPÇÕES código, ADICIONAR código quantidade | extra:quantidade | observação, REMOVER linha, CARRINHO ou LIMPAR. Para finalizar: RETIRADA nome | Pix, Cartão ou Dinheiro; ou ENTREGA nome | rua | número | bairro | pagamento. Para pedir troco, escreva Dinheiro 50,00 no campo de pagamento.';
 const money = cents => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const methods = { pix: 'Pix', 'cartão': 'Cartão de Crédito', cartao: 'Cartão de Crédito', dinheiro: 'Dinheiro' };
 const json = value => typeof value === 'string' ? JSON.parse(value) : value;
@@ -81,7 +82,7 @@ async function handleCart(db, row, placeOrder, link) {
   if (command === 'confirmar') {
     if (quote?.order) return quote.order;
     if (!quote || args !== quote.code || Date.now() > quote.expires) return 'Solicite um novo resumo e use o código de confirmação que ele mostrar.';
-    const result = await placeOrder(quote.body, quote.key, quote.total);
+    const result = await placeOrder(quote.body, quote.key, quote.total, quote.cashCents);
     if (!result.success) {
       await save();
       return result.error + ' Envie os dados da modalidade novamente para revisar.';
@@ -102,7 +103,11 @@ async function handleCart(db, row, placeOrder, link) {
   const fields = rest.length ? args.split('|').map(v => v.trim()) : [];
   const delivery = command === 'entrega';
   if (fields.length !== (delivery ? 5 : 2) || fields.some(field => !field || field.length > 160)) return HELP;
-  const paymentKey = fields.at(-1).toLowerCase();
+  const paymentInput = fields.at(-1).toLowerCase();
+  const cashInput = /^dinheiro\s+(.+)$/.exec(paymentInput);
+  const cashCents = cashInput ? parseCashAmount(cashInput[1]) : undefined;
+  if (cashInput && !cashCents) return 'Informe o valor em dinheiro. Exemplo: Dinheiro 50,00.';
+  const paymentKey = cashInput ? 'dinheiro' : paymentInput;
   const payment = Object.hasOwn(methods, paymentKey) ? methods[paymentKey] : null;
   if (!payment || typeof payment !== 'string') return 'Escolha Pix, Cartão ou Dinheiro.';
   const [name, street = '', number = '', neighborhood = ''] = delivery ? fields : [fields[0]];
@@ -111,12 +116,13 @@ async function handleCart(db, row, placeOrder, link) {
   if (!operations.is_open) return operations.status_message;
   const fee = Math.round(Number(quoteDelivery(operations, method, neighborhood).fee) * 100);
   const priced = await price(fee);
+  if (cashCents !== undefined && cashCents < priced.grossCents) return 'O valor em dinheiro precisa cobrir o total de ' + money(priced.grossCents) + '.';
   const key = randomUUID();
   const code = key.slice(0, 8);
   const review = summary(priced, fee) + '\n' + (delivery ? 'Entrega: ' + [street, number, neighborhood].join(', ') :
-    'Retirada: ' + operations.pickup_address) + '\nPagamento: ' + payment + '\nPara pedir, envie CONFIRMAR ' + code + '.';
+    'Retirada: ' + operations.pickup_address) + '\nPagamento: ' + payment + (cashCents === undefined ? '' : '\n' + cashChangeNote(cashCents, priced.grossCents)) + '\nPara pedir, envie CONFIRMAR ' + code + '.';
   if (review.length > 4096) return 'O resumo é longo demais. Remova uma linha para continuar.';
-  await save({ key, code, expires: Date.now() + 600000, total: priced.grossCents, body: {
+  await save({ key, code, expires: Date.now() + 600000, cashCents, total: priced.grossCents, body: {
     company_id: Number(row.company_id), items, fulfillment_method: method, delivery_fee: (fee / 100).toFixed(2),
     payment_method: payment, customer: { name, phone: row.sender, street, number, neighborhood }
   } });

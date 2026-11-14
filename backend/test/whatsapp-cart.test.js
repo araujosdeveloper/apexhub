@@ -23,10 +23,11 @@ test('carrinho WhatsApp preserva personalizações e usa confirmação única no
   } };
   let checkouts = 0;
   const send = body => handleCart(db, { company_id: 42, phone_number_id: '400', sender: '558600000000', body },
-    async (order, key, total) => {
+    async (order, key, total, cashCents) => {
       checkouts++;
       assert.match(key, /^[0-9a-f-]{36}$/);
       assert.equal(total, 2700);
+      assert.equal(cashCents, 5000);
       assert.deepEqual(order.items.map(item => [item.option_quantities, item.notes]), [
         [{ ovo: 1 }, 'sem batata'], [{ salsicha: 1 }, '']
       ]);
@@ -34,7 +35,9 @@ test('carrinho WhatsApp preserva personalizações e usa confirmação única no
     }, 'https://bebella.apexdelivery.com.br/');
   await send('ADICIONAR 12 1 | ovo:1 | sem batata');
   await send('ADICIONAR 12 1 | salsicha:1');
-  const review = await send('ENTREGA Ana | Rua A | 10 | Joia | Dinheiro');
+  assert.match(await send('ENTREGA Ana | Rua A | 10 | Joia | Dinheiro 26,99'), /precisa cobrir/);
+  const review = await send('ENTREGA Ana | Rua A | 10 | Joia | Dinheiro 50,00');
+  assert.match(review, /Troco para R\$\s*50,00 · Levar R\$\s*23,00/);
   const code = review.match(/CONFIRMAR ([a-f0-9]+)/)[1];
   assert.match(review, /Ovo \(sem batata\)/);
   assert.match(await send('CONFIRMAR errado'), /novo resumo/);
