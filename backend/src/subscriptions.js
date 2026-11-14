@@ -3,10 +3,12 @@
 const { asyncRoute } = require('./auth');
 const { requireRoles } = require('./middlewares/auth');
 
+const WHATSAPP_AUTOMATION = 'whatsapp_automation';
+
 const FEATURES = Object.freeze({
-  trial: ['ai_menu_import', 'coupons', 'automations', 'kds'],
+  trial: ['ai_menu_import', 'coupons', 'automations', 'kds', WHATSAPP_AUTOMATION],
   essencial: ['kds'],
-  pro: ['ai_menu_import', 'coupons', 'automations', 'kds']
+  pro: ['ai_menu_import', 'coupons', 'automations', 'kds', WHATSAPP_AUTOMATION]
 });
 
 function normalizePlan(value) {
@@ -39,6 +41,10 @@ async function loadSubscription(db, companyId) {
   return subscriptionState(rows[0]);
 }
 
+function hasSubscriptionFeature(subscription, feature) {
+  return subscription.features?.includes(feature) === true;
+}
+
 function subscriptionRequired(res, subscription, feature) {
   const message = subscription.access_state === 'trial_expired'
     ? 'Seu período de teste terminou. Escolha um plano para continuar usando o painel.'
@@ -61,7 +67,7 @@ function checkSubscription(db, feature) {
   return asyncRoute(async (req, res, next) => {
     const subscription = await loadSubscription(db, req.tenantId);
     req.subscription = subscription;
-    if (!subscription.features?.includes(feature)) return subscriptionRequired(res, subscription, feature);
+    if (!hasSubscriptionFeature(subscription, feature)) return subscriptionRequired(res, subscription, feature);
     next();
   });
 }
@@ -84,4 +90,7 @@ function installSubscriptions(app, db, auth) {
   }));
 }
 
-module.exports = { FEATURES, normalizePlan, subscriptionState, loadSubscription, checkSubscription, installSubscriptions };
+module.exports = {
+  FEATURES, WHATSAPP_AUTOMATION, normalizePlan, subscriptionState,
+  loadSubscription, hasSubscriptionFeature, checkSubscription, installSubscriptions
+};
