@@ -1,3 +1,4 @@
+const { startWhatsAppReplies } = require('./src/whatsapp-reply');
 const mysql = require('mysql2/promise');
 const { createApp } = require('./src/app');
 const {configuration}=require('./src/jwt');
@@ -43,7 +44,8 @@ async function start() {
   ]) await db.execute(sql);
   const app = createApp(db, { secureCookies: process.env.SECURE_COOKIES === 'true',jwt });
   const server = app.listen(Number(process.env.PORT || 3000), () => console.log('Apex Delivery: API iniciada.'));
-  const shutdown = () => { app.locals.orderEvents.closeAll(); server.close(async () => { await db.end(); process.exit(0); }); };
+  const stopWhatsAppReplies = startWhatsAppReplies(db);
+  const shutdown = () => { stopWhatsAppReplies(); app.locals.orderEvents.closeAll(); server.close(async () => { await db.end(); process.exit(0); }); };
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);
 }
