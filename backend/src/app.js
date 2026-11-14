@@ -4,6 +4,7 @@ const {isPlatformAdminPath,responseEnvelope}=require('./platform-admin-http');
 const {configuration}=require('./jwt');
 const {requireRoles}=require('./middlewares/auth');
 const {checkSubscription,installSubscriptions,loadSubscription,subscriptionRequired}=require('./subscriptions');
+const { installWhatsAppInbound } = require('./whatsapp-inbound');
 const { installWhatsAppConnection } = require('./whatsapp-connection');
 const { installMaster } = require('./master');
 const { installAppShell } = require('./app-shell');
@@ -37,6 +38,7 @@ function createApp(db, options = {}) {
   app.locals.orderEvents = orderEvents;
   app.disable('x-powered-by');
   app.use((req,res,next)=>isPlatformAdminPath(req.path)?responseEnvelope(req,res,next):next());
+  installWhatsAppInbound(app, db, options.whatsappConnection);
   app.use(express.json({ limit: '64kb' }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
