@@ -15,6 +15,7 @@ function fullColumns() {
   platform_audit:['id','admin_id','action','entity_id','details','created_at'],
   platform_impersonations:['id','cookie_hash','admin_id','master_session_hash','company_id','owner_id','exchanged','expires_at','created_at'],
   categories:['created_at'],product_options:['id','tenant_id','product_id','option_key','group_key','name','additional_price','max_quantity','is_active','created_at'],
+  company_whatsapp_connections:['company_id','waba_id','phone_number_id','display_phone','encrypted_token','connected_by','connected_at'],
   store_images:['company_id','kind','content_type','content','digest'],subscription_plan_requests:['company_id','plan_code','status','created_at','updated_at']
  };
  return Object.entries(schema).flatMap(([table_name,names])=>names.map(column_name=>({table_name,column_name,column_type:column_name==='id'?'int unsigned':'varchar(500)'})));

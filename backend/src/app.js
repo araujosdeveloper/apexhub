@@ -4,6 +4,7 @@ const {isPlatformAdminPath,responseEnvelope}=require('./platform-admin-http');
 const {configuration}=require('./jwt');
 const {requireRoles}=require('./middlewares/auth');
 const {checkSubscription,installSubscriptions,loadSubscription,subscriptionRequired}=require('./subscriptions');
+const { installWhatsAppConnection } = require('./whatsapp-connection');
 const { installMaster } = require('./master');
 const { installAppShell } = require('./app-shell');
 const { installDashboard } = require('./dashboard');
@@ -52,6 +53,7 @@ function createApp(db, options = {}) {
   });
   const auth = installAuth(app, db, options);
   installSubscriptions(app, db, auth);
+  installWhatsAppConnection(app, db, auth, options.whatsappConnection);
   installImpersonation(app,db,options);
   const menuImportGate=require('./menu-import-ai').importGate({key:req=>req.auth.scope==='master'?'master:'+req.master.id:'tenant:'+req.tenantId});
   app.use('/api/tenant/menu',require('./routes/tenant-menu').tenantMenuRouter(db,auth,app.locals.logger,{extractor:options.menuImportExtractor,gate:menuImportGate,aiSubscriptionGate:checkSubscription(db,'ai_menu_import')}));

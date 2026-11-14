@@ -14,7 +14,14 @@
 <section><h2>Modalidades e prazos</h2><div class="grid"><div><label><input type="checkbox" id="delivery-enabled">Delivery</label><label for="delivery-minutes">Previsão de entrega em minutos</label><input id="delivery-minutes" type="number" min="1" max="240" required></div><div><label><input type="checkbox" id="pickup-enabled">Retirada no balcão</label><label for="pickup-minutes">Previsão de retirada em minutos</label><input id="pickup-minutes" type="number" min="1" max="240" required></div></div><label for="pickup-address">Endereço completo para retirada</label><input id="pickup-address" maxlength="320" placeholder="Rua, número, bairro e cidade"><p>O endereço aparece para o cliente ao escolher retirada.</p></section>
 <section class="zones"><h2>Áreas e taxas de entrega</h2><label><input type="checkbox" id="zones-enabled">Entregar somente nos bairros cadastrados abaixo</label><p>Quando desativado, a loja aceita qualquer bairro, sem taxa de entrega. Quando ativado, cada bairro tem sua própria taxa; outros bairros não podem finalizar delivery.</p><div id="zones"></div><button type="button" id="add-zone" class="secondary">Adicionar bairro</button></section>
 <div class="actions"><button id="save">Salvar operação</button><span id="message" role="status" aria-live="polite"></span></div>
-</fieldset></form></main>
+</fieldset></form>
+<section id="whatsapp-settings" hidden>
+  <h2>WhatsApp automatizado</h2>
+  <p id="whatsapp-status" role="status" aria-live="polite">Consultando a conexão…</p>
+  <button id="connect-whatsapp" type="button" hidden disabled>Conectar WhatsApp</button>
+</section>
+</main>
+<script src="/whatsapp-connection.js" defer></script>
 <script>
 const $ = id => document.getElementById(id);
 const days = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];

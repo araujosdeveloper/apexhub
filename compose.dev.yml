@@ -25,6 +25,8 @@ services:
         required: false
       - path: .env.ai
         required: false
+      - path: .env.whatsapp
+        required: false
     build: .
     restart: unless-stopped
     environment:
