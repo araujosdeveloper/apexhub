@@ -1,4 +1,5 @@
 'use strict';
+const { updateWithNotice } = require('./whatsapp-notices');
 const { asyncRoute } = require('./auth');
 const { adminErrorHandler, success } = require('./platform-admin-http');
 const { utcDate } = require('./utc-date');
@@ -48,8 +49,8 @@ function installTenantOrders(app, db, auth, events) {
       return res.status(400).json({ success: false, data: null, message: 'Pedido ou status inválido.' });
     }
     const sources = transitions[target];
-    const result = await db.execute(`UPDATE orders SET status=? WHERE id=? AND company_id=? AND status IN (${sources.map(() => '?').join(',')})${target === 'completed' ? " AND (fulfillment_method='pickup' OR status='delivering')" : ''}${expected !== undefined ? ' AND status=?' : ''}`,
-      [target, id, req.tenantId, ...sources, ...(expected !== undefined ? [expected] : [])]);
+    const result = await updateWithNotice(db, `UPDATE orders SET status=? WHERE id=? AND company_id=? AND status IN (${sources.map(() => '?').join(',')})${target === 'completed' ? " AND (fulfillment_method='pickup' OR status='delivering')" : ''}${expected !== undefined ? ' AND status=?' : ''}`,
+      [target, id, req.tenantId, ...sources, ...(expected !== undefined ? [expected] : [])], { companyId: req.tenantId, orderId: id, target });
     if (!result[0].affectedRows) {
       const [own] = await db.execute('SELECT id FROM orders WHERE id=? AND company_id=?', [id, req.tenantId]);
       return res.status(own.length ? 409 : 404).json({ success: false, data: null, message: own.length ? 'Transição de status não permitida; atualize os pedidos.' : 'Pedido não encontrado.' });

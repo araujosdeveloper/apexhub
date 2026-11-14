@@ -128,10 +128,29 @@
     }
   }
 
+  async function loadNoticeHistory() {
+    const response = await fetch(endpoint + '/notices', { cache: 'no-store' });
+    if (!response.ok) return;
+    const { available, notices } = await response.json();
+    if (!available) return;
+    const states = { queued: 'Em fila', uncertain: 'Resultado incerto', accepted: 'Aceito pela Meta',
+      delivered: 'Entregue', rejected: 'Falhou', suppressed: 'Suprimido' };
+    const kinds = { preparing: 'Em preparo', ready: 'Pronto para retirada', delivering: 'Saiu para entrega', cancelled: 'Cancelado' };
+    const list = document.getElementById('whatsapp-notice-list');
+    list.replaceChildren(...(notices.length ? notices : [null]).map(notice => {
+      const li = document.createElement('li');
+      li.textContent = notice ? 'Pedido #' + notice.order_id + ' · ' + kinds[notice.kind] + ' · ' + states[notice.state]
+        : 'Nenhum aviso registrado.';
+      return li;
+    }));
+    document.getElementById('whatsapp-notice-history').hidden = false;
+  }
+
   api().then(async data => {
     if (!data) return;
     panel.hidden = false;
     render(data);
+    loadNoticeHistory().catch(() => {});
     test.onclick = () => action('test');
     toggle.onclick = () => action(Number(data.connection?.automation_enabled) ? 'pause' : 'activate');
     disconnect.onclick = () => {

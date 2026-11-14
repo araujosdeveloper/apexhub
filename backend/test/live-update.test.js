@@ -15,6 +15,8 @@ function fullColumns() {
   platform_audit:['id','admin_id','action','entity_id','details','created_at'],
   platform_impersonations:['id','cookie_hash','admin_id','master_session_hash','company_id','owner_id','exchanged','expires_at','created_at'],
   categories:['created_at'],product_options:['id','tenant_id','product_id','option_key','group_key','name','additional_price','max_quantity','is_active','created_at'],
+  whatsapp_order_notices:['id','company_id','order_id','kind','state','phone_number_id','provider_message_id','created_at'],
+  whatsapp_notice_optouts:['company_id','sender'],
   whatsapp_handoffs:['company_id','phone_number_id','sender','state','actor_id','skip_through','updated_at'],
   whatsapp_human_replies:['company_id','phone_number_id','sender','request_key','actor_id','body','state','provider_message_id','created_at'],
   whatsapp_carts:['company_id','phone_number_id','sender','items','quote','updated_at'],

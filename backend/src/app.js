@@ -1,3 +1,4 @@
+const { enabled: noticesEnabled, sender: noticeSender, grantNoticeConsent, updateWithNotice } = require('./whatsapp-notices');
 const { cashChangeNote } = require('./cash-change');
 const {installImpersonation}=require('./impersonation');
 const {platformAdminRouter}=require('./routes/platform-admin');
@@ -95,7 +96,7 @@ function createApp(db, options = {}) {
       LEFT JOIN product_images i ON i.product_id=p.id JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
       WHERE p.company_id = ? AND p.active = 1 AND c.active = 1 ORDER BY p.id`, [company.id]);
     const menu = await decorateMenu(db, company.id, products.map(product => withImage(publicProduct(product))));
-    res.json({ company, categories, ...menu, operations: availability(await loadOperations(db, company.id)) });
+    res.json({ company, categories, ...menu, ...(noticesEnabled() ? { whatsapp_status_available: true } : {}), operations: availability(await loadOperations(db, company.id)) });
   }));
   const manage = requireRoles('tenant_owner','tenant_manager');
   installCatalogEditing(app, db, auth, manage);
@@ -170,7 +171,7 @@ function createApp(db, options = {}) {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1 || !['preparing', 'ready', 'delivering', 'completed', 'cancelled'].includes(status) || (expected !== undefined && !['pending','preparing','ready','delivering','completed','cancelled'].includes(expected))) return res.status(400).json({ error: 'Pedido ou status inválido.' });
     const allowed = Object.keys(transitions).filter(key => transitions[key].includes(status));
-    const [result] = await db.execute(`UPDATE orders SET status = ? WHERE id = ? AND company_id = ? AND status IN (${allowed.map(() => '?').join(',')})${status === 'delivering' ? " AND fulfillment_method = 'delivery'" : ''}${expected !== undefined ? ' AND status = ?' : ''}`, [status, id, req.tenantId, ...allowed, ...(expected !== undefined ? [expected] : [])]);
+    const [result] = await updateWithNotice(db, `UPDATE orders SET status = ? WHERE id = ? AND company_id = ? AND status IN (${allowed.map(() => '?').join(',')})${status === 'delivering' ? " AND fulfillment_method = 'delivery'" : ''}${expected !== undefined ? ' AND status = ?' : ''}`, [status, id, req.tenantId, ...allowed, ...(expected !== undefined ? [expected] : [])], { companyId: req.tenantId, orderId: id, target: status });
     if (!result.affectedRows) {
       const [rows] = await db.execute('SELECT id FROM orders WHERE id = ? AND company_id = ?', [id, req.tenantId]);
       return res.status(rows.length ? 409 : 404).json({ error: rows.length ? 'Transição de status não permitida. Atualize o painel.' : 'Pedido não encontrado.' });
@@ -209,6 +210,7 @@ function createApp(db, options = {}) {
       items.some(i => !i || !Number.isSafeInteger(i.product_id || i.id) || (i.product_id || i.id) < 1 || !Number.isSafeInteger(i.quantity) || i.quantity < 1 || i.quantity > 99 || (i.notes !== undefined && (typeof i.notes !== 'string' || i.notes.length > 500)))) {
       return res.status(400).json({ error: 'Confira os dados de entrega, os itens e a forma de pagamento.' });
     }
+    const noticeConsent = noticesEnabled() && body.whatsapp_status_consent === true && Boolean(noticeSender(customer.phone));
     let quantities, lines;
     try { ({ quantities, lines } = normalizeLines(items)); }
     catch (error) { return res.status(400).json({ error: error.message }); }
@@ -221,7 +223,7 @@ function createApp(db, options = {}) {
         const [[company]] = await conn.execute('SELECT slug FROM companies WHERE id = ? AND active = 1', [company_id]);
         if (!company || company.slug !== hostSlug) { await conn.rollback(); return res.status(404).json({ error: 'Restaurante indisponível neste domínio.' }); }
       }
-      const reservation = await reserveCheckout(conn, company_id, requestKey, checkoutHash(company_id, customer, payment_method, quantities, fulfillment_method, delivery_fee, lines, code, couponDiscount, couponSubtotal, cashCents));
+      const reservation = await reserveCheckout(conn, company_id, requestKey, checkoutHash(company_id, customer, payment_method, quantities, fulfillment_method, delivery_fee, lines, code, couponDiscount, couponSubtotal, cashCents, body.whatsapp_status_consent === true));
       if (reservation.conflict) { await conn.rollback(); return res.status(409).json({ error: 'Este envio já foi usado com outros dados. Confira o pedido antes de tentar novamente.' }); }
       if (reservation.order) {
         const tracking_url=await ensureTracking(conn,reservation.order.id);
@@ -277,6 +279,7 @@ function createApp(db, options = {}) {
       }
       if (coupon) await conn.execute('UPDATE company_coupons SET usage_count = usage_count + 1 WHERE id = ? AND company_id = ?', [coupon.id, company_id]);
       const tracking_url=await ensureTracking(conn,order.insertId);
+      if (noticeConsent) await grantNoticeConsent(conn, company_id, order.insertId);
       await conn.execute('UPDATE checkout_requests SET order_id = ? WHERE company_id = ? AND request_key = ?', [order.insertId, company_id, requestKey]);
       await conn.commit();
       orderEvents.publish(company_id);

@@ -96,6 +96,10 @@
                 <p class="text-xs text-secondary mt-2">A escolha informa como você pagará à loja. Não há cobrança online neste checkout.</p>
             </div>
 
+            <label id="whatsapp-status-offer" hidden>
+                <input id="whatsapp-status-consent" type="checkbox">
+                Quero receber avisos deste pedido no WhatsApp. Posso cancelar enviando SAIR.
+            </label>
             <button id="send-order" onclick="sendOrder()" class="w-full action-primary text-primary py-3 rounded-xl font-bold hover:action-primary transition text-center">
                 Confirmar pedido
             </button>
@@ -150,6 +154,8 @@
                 storeData = await response.json();
 
                 companyId = storeData.company.id;
+                const noticeOffer = document.getElementById('whatsapp-status-offer');
+                if (noticeOffer) noticeOffer.hidden = storeData.whatsapp_status_available !== true;
                 companyPhone = storeData.company.whatsapp_phone;
                 const saved = storageGet(cartStorageKey);
                 let removedItems = false;
@@ -504,6 +510,10 @@
                 items: cart.map(({ id, quantity, option_ids, addon_version, notes, option_quantities }) => ({ product_id: id, quantity, ...(option_ids?.length ? { option_ids } : {}), ...(addon_version ? { addon_version } : {}), ...(notes ? { notes } : {}), ...(option_quantities ? { option_quantities } : {}) })),
                 payment_method: payment
             };
+            const noticeOptIn = document.getElementById('whatsapp-status-consent');
+            if (noticeOptIn?.checked && !document.getElementById('whatsapp-status-offer').hidden) {
+                orderPayload.whatsapp_status_consent = true;
+            }
             // Conserva o conteúdo dos reenvios de delivery gratuitos anteriores a esta atualização.
             if (selection.method === 'pickup') orderPayload.fulfillment_method = 'pickup';
             if (Number(selection.fee) > 0) orderPayload.delivery_fee = selection.fee;
