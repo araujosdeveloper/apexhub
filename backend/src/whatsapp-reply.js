@@ -1,6 +1,7 @@
 'use strict';
 
-const { createDecipheriv, createHash } = require('node:crypto');
+const { createDecipheriv } = require('node:crypto');
+const { withConversationLock } = require('./whatsapp-lock');
 const { handleCart } = require('./whatsapp-cart');
 const { configuredDomain, tenantSlugFromHost } = require('./public-hosts');
 const { loadSubscription, hasSubscriptionFeature, WHATSAPP_AUTOMATION } = require('./subscriptions');
@@ -45,9 +46,11 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
        FROM company_whatsapp_inbox i
        JOIN company_whatsapp_connections w ON w.company_id = i.company_id AND w.phone_number_id = i.phone_number_id
        JOIN companies c ON c.id = i.company_id AND c.active = 1
+       LEFT JOIN whatsapp_handoffs h ON h.company_id = i.company_id AND h.phone_number_id = i.phone_number_id AND h.sender = i.sender
        LEFT JOIN whatsapp_initial_replies r ON r.inbox_id = i.id
        WHERE i.company_id = ? AND i.sender = ? AND i.message_type = 'text'
          AND i.body IS NOT NULL
+         AND (h.state IS NULL OR (h.state = 'bot' AND i.id > h.skip_through))
          ${placeOrder ? '' : "AND LOWER(TRIM(i.body)) IN ('oi', 'olá', 'ola', 'cardápio', 'cardapio', 'menu')"}
          AND i.received_at >= CURRENT_TIMESTAMP - INTERVAL 2 MINUTE AND r.inbox_id IS NULL
        ORDER BY i.id LIMIT 10`, [companyId, sender]);
@@ -66,7 +69,13 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
     }
     const link = 'https://' + host + '/';
     let body = 'Olá! Veja o cardápio e faça seu pedido aqui: ' + link;
-    if (placeOrder) {
+    const handoff = placeOrder && /^(atendente|(?:quero )?falar com (?:um )?atendente)[.! ]*$/iu.test(row.body.trim());
+    if (handoff) {
+      await db.execute(`INSERT INTO whatsapp_handoffs (company_id, phone_number_id, sender, state)
+        VALUES (?, ?, ?, 'waiting') ON DUPLICATE KEY UPDATE state = 'waiting', actor_id = NULL`,
+      [row.company_id, row.phone_number_id, row.sender]);
+      body = 'Solicitei atendimento da equipe. Seu carrinho ficou salvo.';
+    } else if (placeOrder) {
       try {
         body = await handleCart(db, row, placeOrder, link);
       } catch (error) {
@@ -77,6 +86,7 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
     const [state, id] = await sendReply(row, token, version, body, fetchGraph);
     await db.execute('UPDATE whatsapp_initial_replies SET state = ?, provider_message_id = ? WHERE inbox_id = ?',
       [state, id, row.id]);
+    if (handoff) break;
   }
 }
 
@@ -92,25 +102,7 @@ function startWhatsAppReplies(db, env = process.env, placeOrder) {
     if (running) return;
     running = true;
     try {
-      const lock = createHash('sha256').update('whatsapp-cart:' + companyId + ':' + sender).digest('hex');
-      const conn = await db.getConnection();
-      let reusable = true;
-      try {
-        const [[result]] = await conn.execute('SELECT GET_LOCK(?, 0) AS acquired', [lock]);
-        if (Number(result.acquired) !== 1) return;
-        try {
-          await processInitialReplies(conn, options);
-        } finally {
-          const [[release]] = await conn.execute('SELECT RELEASE_LOCK(?) AS released', [lock]);
-          if (Number(release.released) !== 1) reusable = false;
-        }
-      } catch (error) {
-        reusable = false;
-        throw error;
-      } finally {
-        if (reusable) conn.release();
-        else conn.destroy();
-      }
+      await withConversationLock(db, companyId, sender, conn => processInitialReplies(conn, options));
     } catch {
       console.error('Falha ao processar respostas iniciais do WhatsApp.');
     } finally {
@@ -120,4 +112,4 @@ function startWhatsAppReplies(db, env = process.env, placeOrder) {
   return () => clearInterval(timer);
 }
 
-module.exports = { processInitialReplies, startWhatsAppReplies };
+module.exports = { sendReply, decryptToken, processInitialReplies, startWhatsAppReplies };

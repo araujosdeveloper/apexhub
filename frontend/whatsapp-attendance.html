@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Atendimentos WhatsApp · Apex Delivery</title>
+  <link rel="stylesheet" href="/plans.css">
+  <script src="/whatsapp-attendance.js" defer></script>
+</head>
+<body>
+<main class="page">
+  <a href="/operations.html">Voltar às configurações</a>
+  <h1>Atendimentos WhatsApp</h1>
+  <button id="refresh" type="button">Atualizar</button>
+  <p id="status" role="status" aria-live="polite"></p>
+  <ul id="conversations"></ul>
+  <section id="detail" class="plan-card" hidden>
+    <h2 id="conversation-title"></h2>
+    <button id="claim" type="button" hidden>Assumir conversa</button>
+    <button id="resume" type="button" hidden>Retomar bot</button>
+    <h3>Mensagens recentes</h3>
+    <ol id="history"></ol>
+    <h3>Carrinho</h3>
+    <ul id="items"></ul>
+    <form id="reply" hidden>
+      <label for="body">Mensagem ao cliente</label>
+      <textarea id="body" maxlength="4096" required></textarea>
+      <button type="submit">Enviar</button>
+    </form>
+  </section>
+</main>
+</body>
+</html>
