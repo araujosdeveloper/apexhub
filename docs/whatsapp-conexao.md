@@ -5,11 +5,12 @@ número comercial na Meta. A opção usa a permissão da assinatura e aparece
 quando a plataforma estiver configurada. O telefone de contato da loja é
 independente dessa autorização.
 
-Configure no ambiente do processo Apex os valores de `docker.env.example`
-para o aplicativo da Meta e seu Embedded Signup v4. Gere a chave de proteção
-dos tokens com `openssl rand -hex 32` e guarde-a fora do repositório. Ao usar
-Docker Compose, encaminhe essas variáveis explicitamente para o serviço da
-aplicação. Cadastre na Meta o domínio público usado pelo painel e confirme
+Copie as cinco variáveis do bloco WhatsApp em `docker.env.example` para
+`.env.whatsapp`, na pasta do projeto, com permissões 0600. O Compose de
+desenvolvimento e o de publicação carregam esse arquivo no serviço da aplicação.
+Preencha os dados do aplicativo da Meta e seu Embedded Signup v4. Gere a chave
+de proteção dos tokens com `openssl rand -hex 32` e guarde-a fora do repositório.
+Cadastre na Meta o domínio público usado pelo painel e confirme
 as permissões de gerenciamento e envio antes de testar com a Bebella.
 
 O vínculo valida a conta e o número na Graph API. A autorização fica
