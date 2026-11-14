@@ -1,3 +1,4 @@
+const { cashChangeNote } = require('./cash-change');
 const {installImpersonation}=require('./impersonation');
 const {platformAdminRouter}=require('./routes/platform-admin');
 const {isPlatformAdminPath,responseEnvelope}=require('./platform-admin-http');
@@ -175,12 +176,15 @@ function createApp(db, options = {}) {
     orderEvents.publish(req.tenantId);
     res.json({ success: true });
   }));
-  const placeOrder = async (req, res, expectedTotalCents) => {
+  const placeOrder = async (req, res, expectedTotalCents, cashCents) => {
     const body = req.body || {};
     const company_id = body.tenant_id ?? body.company_id;
     const hostSlug = tenantSlugFromHost(req);
     if (isMasterHost(req)) return res.status(404).json({ error: 'Rota não encontrada.' });
     const { items, payment_method, fulfillment_method = 'delivery', delivery_fee } = body;
+    if (cashCents !== undefined && (payment_method !== 'Dinheiro' || !Number.isSafeInteger(cashCents) || cashCents < 1 || cashCents > 999999999)) {
+      return res.status(400).json({ error: 'Informe um valor de troco válido para pagamento em dinheiro.' });
+    }
     let code = '';
     try { if (req.body?.coupon_code !== undefined && req.body.coupon_code !== '') code = couponCode(req.body.coupon_code); }
     catch (error) { return res.status(400).json({ error: error.message }); }
@@ -215,7 +219,7 @@ function createApp(db, options = {}) {
         const [[company]] = await conn.execute('SELECT slug FROM companies WHERE id = ? AND active = 1', [company_id]);
         if (!company || company.slug !== hostSlug) { await conn.rollback(); return res.status(404).json({ error: 'Restaurante indisponível neste domínio.' }); }
       }
-      const reservation = await reserveCheckout(conn, company_id, requestKey, checkoutHash(company_id, customer, payment_method, quantities, fulfillment_method, delivery_fee, lines, code, couponDiscount, couponSubtotal));
+      const reservation = await reserveCheckout(conn, company_id, requestKey, checkoutHash(company_id, customer, payment_method, quantities, fulfillment_method, delivery_fee, lines, code, couponDiscount, couponSubtotal, cashCents));
       if (reservation.conflict) { await conn.rollback(); return res.status(409).json({ error: 'Este envio já foi usado com outros dados. Confira o pedido antes de tentar novamente.' }); }
       if (reservation.order) {
         const tracking_url=await ensureTracking(conn,reservation.order.id);
@@ -246,6 +250,10 @@ function createApp(db, options = {}) {
         await conn.rollback();
         return res.status(409).json({ error: 'O total mudou. Solicite um novo resumo antes de confirmar.' });
       }
+      if (cashCents !== undefined && cashCents < totalCents) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'O valor em dinheiro precisa cobrir o total do pedido.' });
+      }
       await conn.execute(`INSERT INTO customers (company_id, name, phone, address_street, address_number, address_neighborhood) VALUES (?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE name = VALUES(name), address_street = IF(VALUES(address_street) = '', address_street, VALUES(address_street)), address_number = IF(VALUES(address_street) = '', address_number, VALUES(address_number)), address_neighborhood = IF(VALUES(address_street) = '', address_neighborhood, VALUES(address_neighborhood))`,
       [company_id, ...fields.map(f => customer[f].trim())]);
@@ -257,6 +265,10 @@ function createApp(db, options = {}) {
         fulfillment_method, quote.fee, fulfillment_method === 'pickup' ? operations.pickup_address : '',
         fulfillment_method === 'pickup' ? operations.pickup_minutes : operations.delivery_minutes,
         (discountCents / 100).toFixed(2), code, coupon ? JSON.stringify(coupon.snapshot) : null, phoneKey(customer.phone)]);
+      if (cashCents !== undefined) {
+        await conn.execute('UPDATE orders SET notes = ? WHERE id = ? AND company_id = ?',
+          [cashChangeNote(cashCents, totalCents), order.insertId, company_id]);
+      }
       for (const line of pricedLines) {
         await conn.execute('INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, addons_snapshot, item_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [order.insertId, line.product_id, line.name, line.quantity, (line.unitCents / 100).toFixed(2), (line.unitCents * line.quantity / 100).toFixed(2), JSON.stringify(line.snapshot), line.notes || '']);
@@ -273,14 +285,14 @@ function createApp(db, options = {}) {
     finally { conn.release(); }
   };
   app.post('/api/orders', asyncRoute((req, res) => placeOrder(req, res)));
-  app.locals.placeWhatsAppOrder = async (body, requestKey, expectedTotalCents) => {
+  app.locals.placeWhatsAppOrder = async (body, requestKey, expectedTotalCents, cashCents) => {
     let status = 200;
     return placeOrder({
       body, get: name => name === 'Idempotency-Key' ? requestKey : undefined
     }, {
       status(code) { status = code; return this; },
       json(data) { return { status, ...data }; }
-    }, expectedTotalCents);
+    }, expectedTotalCents, cashCents);
   };
   const frontendFile = name => path.join(__dirname, '../../frontend', name);
   app.get('/', asyncRoute(async (req, res, next) => {

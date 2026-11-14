@@ -47,3 +47,7 @@ ou `RETIRADA Nome | Pix`. Confira o resumo antes de enviar `CONFIRMAR código`.
 O piloto registra pedidos reais no checkout. Use uma loja de teste para
 validar sem acionar a operação da Bebella. A migração 033 persiste carrinhos
 por empresa, número comercial e remetente.
+
+Para pedir troco, use `Dinheiro 50,00` no campo de pagamento. O resumo
+mostra o valor entregue e o troco. Após a confirmação, a informação
+aparece nas observações do pedido no painel.
