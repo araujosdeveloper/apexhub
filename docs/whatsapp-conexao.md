@@ -66,3 +66,17 @@ Antes da ativação, configure a assinatura do webhook no aplicativo Meta e
 registre o número na plataforma quando exigido. Teste recebimento e envio
 com a Bebella para confirmar o funcionamento. Ao ativar, o bot processa
 mensagens novas; pedidos anteriores permanecem no histórico.
+
+### Pedidos em linguagem natural
+
+Para habilitar a interpretação de itens, configure `OPENAI_API_KEY` e
+`WHATSAPP_AI_MODEL` no ambiente da aplicação. A interpretação recebe
+o texto atual e nomes e identificadores do cardápio da loja. Ela não recebe
+o cadastro do cliente, o histórico da conversa nem credenciais da Meta.
+Oriente o cliente a informar endereço e pagamento pelos comandos da
+modalidade. A confirmação continua exigindo o código exibido na cotação.
+
+Teste com “Quero dois hot dogs simples, um com ovo e sem batata palha,
+o outro com salsicha”. Use produtos e adicionais configurados na loja.
+Confira as duas linhas do resumo. Se um item estiver ambíguo, o bot pede
+que o cliente detalhe a escolha antes de alterar o carrinho.

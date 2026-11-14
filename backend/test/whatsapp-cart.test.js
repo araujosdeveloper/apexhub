@@ -22,7 +22,7 @@ test('carrinho WhatsApp preserva personalizações e usa confirmação única no
     cart = { items: args[3], quote: args[4] };
   } };
   let checkouts = 0;
-  const send = body => handleCart(db, { company_id: 42, phone_number_id: '400', sender: '558600000000', body },
+  const send = (body, interpret) => handleCart(db, { company_id: 42, phone_number_id: '400', sender: '558600000000', body },
     async (order, key, total, cashCents) => {
       checkouts++;
       assert.match(key, /^[0-9a-f-]{36}$/);
@@ -32,9 +32,20 @@ test('carrinho WhatsApp preserva personalizações e usa confirmação única no
         [{ ovo: 1 }, 'sem batata'], [{ salsicha: 1 }, '']
       ]);
       return { success: true, order_id: 55, tracking_url: '/track.html#test' };
-    }, 'https://bebella.apexdelivery.com.br/');
-  await send('ADICIONAR 12 1 | ovo:1 | sem batata');
-  await send('ADICIONAR 12 1 | salsicha:1');
+    }, 'https://bebella.apexdelivery.com.br/', interpret);
+  const natural = 'Quero dois hot dogs, um com ovo e sem batata, outro com salsicha';
+  assert.match(await send(natural, async () => ({ action: 'add', items: [
+    { product_id: 12, quantity: 1, notes: '', options: [{ id: 'inventado', quantity: 1 }] }
+  ] })), /Não consegui identificar/);
+  assert.equal(cart, undefined);
+  assert.match(await send(natural, async (message, catalog) => {
+    assert.equal(message, natural);
+    assert.equal(catalog[0].name, 'Hot dog');
+    return { action: 'add', items: [
+      { product_id: 12, quantity: 1, notes: 'sem batata', options: [{ id: 'ovo', quantity: 1 }] },
+      { product_id: 12, quantity: 1, notes: '', options: [{ id: 'salsicha', quantity: 1 }] }
+    ] };
+  }), /Carrinho atualizado/);
   assert.match(await send('ENTREGA Ana | Rua A | 10 | Joia | Dinheiro 26,99'), /precisa cobrir/);
   const review = await send('ENTREGA Ana | Rua A | 10 | Joia | Dinheiro 50,00');
   assert.match(review, /Troco para R\$\s*50,00 · Levar R\$\s*23,00/);

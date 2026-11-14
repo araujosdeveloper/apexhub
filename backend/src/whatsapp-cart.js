@@ -1,6 +1,7 @@
 'use strict';
 
 const { parseCashAmount, cashChangeNote } = require('./cash-change');
+const { catalogForInterpreter, readIntent } = require('./whatsapp-language');
 const { randomUUID } = require('node:crypto');
 const { normalizeLines, publicProduct } = require('./addons');
 const { priceCart } = require('./cart-pricing');
@@ -15,10 +16,10 @@ const productQuery = `SELECT p.id, p.name, p.price, a.config AS addon_config, a.
   LEFT JOIN product_addons a ON a.product_id = p.id
   WHERE p.company_id = ? AND p.active = 1 AND c.active = 1`;
 
-async function handleCart(db, row, placeOrder, link) {
+async function handleCart(db, row, placeOrder, link, interpret) {
   const text = row.body.trim();
   const [first, ...rest] = text.split(/\s+/);
-  const command = first.toLowerCase();
+  let command = first.toLowerCase();
   const args = text.slice(first.length).trim();
   if (['oi', 'olá', 'ola', 'cardápio', 'cardapio', 'menu'].includes(command) && !args) {
     return 'Olá! Veja o cardápio em ' + link + ' ou envie PRODUTOS para montar seu pedido aqui.';
@@ -49,6 +50,34 @@ async function handleCart(db, row, placeOrder, link) {
       line.snapshot.map(extra => (extra.quantity || 1) + ' × ' + extra.name).join(', ') : '') +
       (line.notes ? ' (' + line.notes + ')' : '') + ' · ' + money(line.unitCents * line.quantity)
   ).join('\n') + '\nTaxa: ' + money(fee) + '\nTotal: ' + money(priced.grossCents);
+
+  const commands = ['opções', 'opcoes', 'adicionar', 'limpar', 'remover', 'confirmar', 'carrinho', 'entrega', 'retirada'];
+  const clarify = 'Não consegui identificar todos os itens. Envie os nomes do cardápio, a quantidade e os adicionais de cada lanche. Para ajuda, envie ATENDENTE.';
+  if (interpret && !commands.includes(command) && text.length <= 1000 && text) {
+    const [products] = await db.execute(productQuery + ' ORDER BY p.id LIMIT 101', [row.company_id]);
+    if (products.length > 100) return 'Consulte o cardápio completo ' + link + ' ou envie ATENDENTE.';
+    const available = products.map(publicProduct);
+    const catalog = catalogForInterpreter(available);
+    if (JSON.stringify(catalog).length > 32000) return 'Consulte o cardápio completo ' + link + ' ou envie ATENDENTE.';
+    let intent;
+    try { intent = readIntent(await interpret(text, catalog), available); }
+    catch { return 'O atendimento por texto livre está indisponível. ' + HELP; }
+    if (!intent || intent.action === 'clarify') return clarify;
+    if (intent.action === 'menu') return 'Veja o cardápio em ' + link + ' ou envie PRODUTOS.';
+    if (intent.action === 'cart') command = 'carrinho';
+    if (intent.action === 'add') {
+      if (items.length + intent.lines.length > 20) return 'Seu carrinho chegou ao limite de linhas. Remova uma linha para continuar.';
+      items.push(...intent.lines);
+      let priced;
+      try { priced = await price(); }
+      catch (error) { if (error.code) throw error; return clarify; }
+      const review = 'Carrinho atualizado:\n' + summary(priced, 0) + '\n' +
+        'Para cotar: RETIRADA nome | pagamento ou ENTREGA nome | rua | número | bairro | pagamento.';
+      if (review.length > 4096) return 'O resumo ficou muito longo. Envie menos itens por vez ou peça um atendente.';
+      await save();
+      return review;
+    }
+  }
 
   if (['opções', 'opcoes', 'adicionar'].includes(command)) {
     const [selection, extras = '', notes = '', ...overflow] = args.split('|').map(v => v.trim());

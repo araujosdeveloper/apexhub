@@ -2,6 +2,7 @@
 
 const { createDecipheriv } = require('node:crypto');
 const { withConversationLock } = require('./whatsapp-lock');
+const { createWhatsAppInterpreter } = require('./whatsapp-language');
 const { handleCart } = require('./whatsapp-cart');
 const { configuredDomain, tenantSlugFromHost } = require('./public-hosts');
 const { loadSubscription, hasSubscriptionFeature, WHATSAPP_AUTOMATION } = require('./subscriptions');
@@ -40,7 +41,7 @@ async function sendReply(row, token, version, body, fetchGraph) {
   }
 }
 
-async function processInitialReplies(db, { companyId, sender, key, version, fetchGraph = fetch, placeOrder, activeOnly = false }) {
+async function processInitialReplies(db, { companyId, sender, key, version, fetchGraph = fetch, placeOrder, interpret, activeOnly = false }) {
   const [rows] = await db.execute(
     `SELECT i.id, i.company_id, i.phone_number_id, i.sender, i.body, w.waba_id, w.encrypted_token, c.slug
        FROM company_whatsapp_inbox i
@@ -86,7 +87,7 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
       body = 'Solicitei atendimento da equipe. Seu carrinho ficou salvo.';
     } else if (placeOrder) {
       try {
-        body = await handleCart(db, row, placeOrder, link);
+        body = await handleCart(db, row, placeOrder, link, interpret);
       } catch (error) {
         body = error.code ? 'Não consegui atualizar o pedido. Tente novamente.' : error.message;
       }
@@ -105,7 +106,7 @@ function startWhatsAppReplies(db, env = process.env, placeOrder) {
   if (!/^[a-f0-9]{64}$/i.test(hexKey || '') || !/^v[0-9]+\.[0-9]+$/.test(version || '')) return () => {};
 
   const pilot = /^[1-9][0-9]{0,9}$/.test(companyId || '') && /^[0-9]{6,20}$/.test(sender || '');
-  const options = { version, key: Buffer.from(hexKey, 'hex'), placeOrder };
+  const options = { version, key: Buffer.from(hexKey, 'hex'), placeOrder, interpret: createWhatsAppInterpreter(env) };
   let running = false;
   const timer = setInterval(async () => {
     if (running) return;
