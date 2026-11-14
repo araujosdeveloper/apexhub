@@ -1,5 +1,6 @@
 'use strict';
 
+const { enabled, sender, applyNoticeStatus } = require('./whatsapp-notices');
 const express = require('express');
 const { createHmac, timingSafeEqual } = require('node:crypto');
 const { asyncRoute } = require('./auth');
@@ -23,22 +24,24 @@ function verifiedEvent(body, signature, secret) {
 const asList = value => Array.isArray(value) ? value : [];
 const metaId = value => typeof value === 'string' && /^[0-9]{1,24}$/.test(value);
 
-async function receive(db, event) {
+async function receive(db, event, notices) {
   if (event?.object !== 'whatsapp_business_account') return;
   for (const entry of asList(event.entry)) {
     if (!metaId(entry?.id)) continue;
     for (const change of asList(entry.changes)) {
       const phoneId = change?.value?.metadata?.phone_number_id;
       const messages = asList(change?.value?.messages);
-      if (change?.field !== 'messages' || !metaId(phoneId) || !messages.length) continue;
+      const statuses = notices ? asList(change?.value?.statuses) : [];
+      if (change?.field !== 'messages' || !metaId(phoneId) || (!messages.length && !statuses.length)) continue;
 
       const [[connection]] = await db.execute(
         `SELECT w.company_id FROM company_whatsapp_connections w
          JOIN companies c ON c.id = w.company_id AND c.active = 1
          WHERE w.waba_id = ? AND w.phone_number_id = ?`, [entry.id, phoneId]);
       if (!connection) continue;
+      for (const status of statuses) await applyNoticeStatus(db, { companyId: connection.company_id, phoneId, status });
       const subscription = await loadSubscription(db, connection.company_id);
-      if (!hasSubscriptionFeature(subscription, WHATSAPP_AUTOMATION)) continue;
+      const eligible = hasSubscriptionFeature(subscription, WHATSAPP_AUTOMATION);
 
       for (const message of messages) {
         if (typeof message?.id !== 'string' || !/^[!-~]{1,255}$/.test(message.id) ||
@@ -48,6 +51,13 @@ async function receive(db, event) {
         const body = type === 'text' && typeof message.text?.body === 'string'
           ? [...message.text.body].slice(0, 4096).join('') : null;
 
+        if (notices && body?.trim().toUpperCase() === 'SAIR') {
+          const to = sender(message.from);
+          if (to) await db.execute(`INSERT INTO whatsapp_notice_optouts (company_id, sender)
+            VALUES (?, ?) ON DUPLICATE KEY UPDATE sender = whatsapp_notice_optouts.sender`, [connection.company_id, to]);
+          continue;
+        }
+        if (!eligible) continue;
         await db.execute(
           `INSERT INTO company_whatsapp_inbox
            (company_id, phone_number_id, message_id, sender, message_type, body)
@@ -85,7 +95,7 @@ function installWhatsAppInbound(app, db, { env = process.env } = {}) {
         return res.sendStatus(400);
       }
       try {
-        await receive(db, event);
+        await receive(db, event, enabled(env));
       } catch {
         // Uma falha transitória pede reentrega. Evita registrar corpos e telefones.
         return res.sendStatus(503);

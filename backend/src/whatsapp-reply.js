@@ -15,7 +15,7 @@ function decryptToken(row, key) {
   return Buffer.concat([decipher.update(packed.subarray(28)), decipher.final()]).toString('utf8');
 }
 
-async function sendReply(row, token, version, body, fetchGraph) {
+async function sendReply(row, token, version, body, fetchGraph, payload) {
   try {
     const response = await fetchGraph(
       'https://graph.facebook.com/' + version + '/' + row.phone_number_id + '/messages',
@@ -27,8 +27,7 @@ async function sendReply(row, token, version, body, fetchGraph) {
         body: JSON.stringify({
           messaging_product: 'whatsapp',
           to: row.sender,
-          type: 'text',
-          text: { body }
+          ...(payload || { type: 'text', text: { body } })
         })
       });
     if ([400, 401, 403, 404, 429].includes(response.status)) return ['rejected', null];

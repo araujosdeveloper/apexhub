@@ -125,6 +125,13 @@ function installWhatsAppConnection(app, db, auth, { env = process.env, fetchGrap
     }
     res.status(201).json({ connection: { display_phone: verified.displayPhone } });
   }));
+  app.get(endpoint + '/notices', auth, owner, directSession, asyncRoute(async (req, res) => {
+    if (env.WHATSAPP_ORDER_NOTICES !== 'true') return res.json({ available: false, notices: [] });
+    const [notices] = await db.execute(`SELECT order_id, kind, state, created_at FROM whatsapp_order_notices
+      WHERE company_id = ? AND kind <> 'consent' ORDER BY id DESC LIMIT 30`, [req.tenantId]);
+    res.json({ available: true, notices });
+  }));
+
   app.patch(endpoint, auth, owner, directSession, asyncRoute(async (req, res) => {
     const action = req.body?.action;
     if (!['test', 'activate', 'pause', 'disconnect'].includes(action)) return res.sendStatus(400);

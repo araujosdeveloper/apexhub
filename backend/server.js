@@ -1,3 +1,4 @@
+const { startWhatsAppNotices } = require('./src/whatsapp-notices');
 const { startWhatsAppReplies } = require('./src/whatsapp-reply');
 const mysql = require('mysql2/promise');
 const { createApp } = require('./src/app');
@@ -45,7 +46,8 @@ async function start() {
   const app = createApp(db, { secureCookies: process.env.SECURE_COOKIES === 'true',jwt });
   const server = app.listen(Number(process.env.PORT || 3000), () => console.log('Apex Delivery: API iniciada.'));
   const stopWhatsAppReplies = startWhatsAppReplies(db, process.env, app.locals.placeWhatsAppOrder);
-  const shutdown = () => { stopWhatsAppReplies(); app.locals.orderEvents.closeAll(); server.close(async () => { await db.end(); process.exit(0); }); };
+  const stopWhatsAppNotices = startWhatsAppNotices(db);
+  const shutdown = () => { stopWhatsAppNotices(); stopWhatsAppReplies(); app.locals.orderEvents.closeAll(); server.close(async () => { await db.end(); process.exit(0); }); };
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);
 }

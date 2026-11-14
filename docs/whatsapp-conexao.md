@@ -80,3 +80,18 @@ Teste com “Quero dois hot dogs simples, um com ovo e sem batata palha,
 o outro com salsicha”. Use produtos e adicionais configurados na loja.
 Confira as duas linhas do resumo. Se um item estiver ambíguo, o bot pede
 que o cliente detalhe a escolha antes de alterar o carrinho.
+
+### Avisos de status do pedido
+
+A migração 036 cria a fila de avisos e o registro de opt-out. Para o piloto,
+habilite `WHATSAPP_ORDER_NOTICES=true` em `.env.whatsapp` e configure
+`WHATSAPP_ORDER_NOTICE_TEMPLATE` e `WHATSAPP_ORDER_NOTICE_LANGUAGE`.
+O modelo da conta de cada loja deve estar aprovado com quatro parâmetros,
+na ordem: nome da loja, número do pedido, etapa e link de acompanhamento.
+Confira o modelo antes de habilitar. A aprovação não é consultada no Apex.
+
+O consentimento é coletado no checkout do cardápio web. Enviar SAIR bloqueia
+novos avisos para aquele número na loja. O envio usa o número vinculado,
+com o bot ativo e o plano elegível. Avisos obsoletos são suprimidos.
+A fila registra rejeição, aceitação, entrega confirmada pelo webhook e
+resultado incerto. Resultado incerto não é reenviado automaticamente.
