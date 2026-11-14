@@ -40,7 +40,7 @@ async function sendReply(row, token, version, body, fetchGraph) {
   }
 }
 
-async function processInitialReplies(db, { companyId, sender, key, version, fetchGraph = fetch, placeOrder }) {
+async function processInitialReplies(db, { companyId, sender, key, version, fetchGraph = fetch, placeOrder, activeOnly = false }) {
   const [rows] = await db.execute(
     `SELECT i.id, i.company_id, i.phone_number_id, i.sender, i.body, w.waba_id, w.encrypted_token, c.slug
        FROM company_whatsapp_inbox i
@@ -50,6 +50,7 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
        LEFT JOIN whatsapp_initial_replies r ON r.inbox_id = i.id
        WHERE i.company_id = ? AND i.sender = ? AND i.message_type = 'text'
          AND i.body IS NOT NULL
+         ${activeOnly ? 'AND w.automation_enabled = 1 AND i.received_at > w.enabled_at' : ''}
          AND (h.state IS NULL OR (h.state = 'bot' AND i.id > h.skip_through))
          ${placeOrder ? '' : "AND LOWER(TRIM(i.body)) IN ('oi', 'olá', 'ola', 'cardápio', 'cardapio', 'menu')"}
          AND i.received_at >= CURRENT_TIMESTAMP - INTERVAL 2 MINUTE AND r.inbox_id IS NULL
@@ -60,7 +61,15 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
     if (!hasSubscriptionFeature(subscription, WHATSAPP_AUTOMATION)) continue;
     const host = row.slug + '.' + configuredDomain();
     if (tenantSlugFromHost(host) !== row.slug || !/^[0-9]{1,24}$/.test(row.phone_number_id)) continue;
-    const token = decryptToken(row, key);
+    if (placeOrder) {
+      const [[active]] = await db.execute(`SELECT 1 AS enabled FROM company_whatsapp_connections
+        WHERE company_id = ? AND phone_number_id = ? AND BINARY encrypted_token = ? AND (automation_enabled = 1 OR (? = 0 AND enabled_at IS NULL))`,
+      [row.company_id, row.phone_number_id, row.encrypted_token, Number(activeOnly)]);
+      if (!active) break;
+    }
+    let token;
+    try { token = decryptToken(row, key); }
+    catch { continue; }
     try {
       await db.execute("INSERT INTO whatsapp_initial_replies (inbox_id, state) VALUES (?, 'uncertain')", [row.id]);
     } catch (error) {
@@ -93,16 +102,33 @@ async function processInitialReplies(db, { companyId, sender, key, version, fetc
 function startWhatsAppReplies(db, env = process.env, placeOrder) {
   const { WHATSAPP_REPLY_PILOT_COMPANY_ID: companyId, WHATSAPP_REPLY_PILOT_SENDER: sender,
     WHATSAPP_CONNECTION_KEY: hexKey, WHATSAPP_META_GRAPH_VERSION: version } = env;
-  if (!/^[1-9][0-9]{0,9}$/.test(companyId || '') || !/^[0-9]{6,20}$/.test(sender || '') ||
-      !/^[a-f0-9]{64}$/i.test(hexKey || '') || !/^v[0-9]+\.[0-9]+$/.test(version || '')) return () => {};
+  if (!/^[a-f0-9]{64}$/i.test(hexKey || '') || !/^v[0-9]+\.[0-9]+$/.test(version || '')) return () => {};
 
-  const options = { companyId, sender, version, key: Buffer.from(hexKey, 'hex'), placeOrder };
+  const pilot = /^[1-9][0-9]{0,9}$/.test(companyId || '') && /^[0-9]{6,20}$/.test(sender || '');
+  const options = { version, key: Buffer.from(hexKey, 'hex'), placeOrder };
   let running = false;
   const timer = setInterval(async () => {
     if (running) return;
     running = true;
     try {
-      await withConversationLock(db, companyId, sender, conn => processInitialReplies(conn, options));
+      const [conversations] = await db.execute(`SELECT i.company_id, i.sender, MIN(i.id) AS first_id
+        FROM company_whatsapp_inbox i JOIN company_whatsapp_connections w
+          ON w.company_id = i.company_id AND w.phone_number_id = i.phone_number_id
+        JOIN companies c ON c.id = i.company_id AND c.active = 1
+        LEFT JOIN whatsapp_handoffs h ON h.company_id = i.company_id AND h.phone_number_id = i.phone_number_id AND h.sender = i.sender
+        LEFT JOIN whatsapp_initial_replies r ON r.inbox_id = i.id
+        WHERE i.received_at >= CURRENT_TIMESTAMP - INTERVAL 2 MINUTE AND i.message_type = 'text'
+          AND i.body IS NOT NULL AND r.inbox_id IS NULL
+          AND (h.state IS NULL OR (h.state = 'bot' AND i.id > h.skip_through))
+          AND ((w.automation_enabled = 1 AND i.received_at > w.enabled_at)
+               OR (w.enabled_at IS NULL AND ? = 1 AND i.company_id = ? AND i.sender = ?))
+        GROUP BY i.company_id, i.sender ORDER BY first_id LIMIT 20`, [Number(pilot), companyId || 0, sender || '']);
+      for (const conversation of conversations) {
+        const activeOnly = !(pilot && String(conversation.company_id) === companyId && conversation.sender === sender);
+        await withConversationLock(db, conversation.company_id, conversation.sender, conn => processInitialReplies(conn, {
+          ...options, companyId: conversation.company_id, sender: conversation.sender, activeOnly
+        }));
+      }
     } catch {
       console.error('Falha ao processar respostas iniciais do WhatsApp.');
     } finally {

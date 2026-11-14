@@ -19,6 +19,7 @@ test('a resposta usa o número da loja e uma tentativa incerta não é repetida'
   const sends = [];
   const db = { async execute(sql, params) {
     if (sql.includes('FROM company_whatsapp_inbox')) return [[row]];
+    if (sql.includes('SELECT 1 AS enabled')) return [[{ enabled: 1 }]];
     if (sql.includes('FROM subscriptions')) return [[{ plan_code: 'pro', status: 'active' }]];
     if (sql.startsWith('INSERT')) {
       if (reserved) throw Object.assign(new Error(), { code: 'ER_DUP_ENTRY' });
@@ -57,6 +58,7 @@ test('pedido de atendente pausa a conversa sem processar o próximo comando da f
       assert.match(sql, /h.state = 'bot' AND i.id > h.skip_through/);
       return [waiting ? [] : [row, { ...row, id: 2, body: 'CONFIRMAR abc' }]];
     }
+    if (sql.includes('SELECT 1 AS enabled')) return [[{ enabled: 1 }]];
     if (sql.includes('FROM subscriptions')) return [[{ plan_code: 'pro', status: 'active' }]];
     if (sql.startsWith('INSERT INTO whatsapp_initial_replies')) reservations++;
     if (sql.startsWith('INSERT INTO whatsapp_handoffs')) {
