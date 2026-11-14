@@ -20,7 +20,7 @@ function fullColumns() {
   whatsapp_carts:['company_id','phone_number_id','sender','items','quote','updated_at'],
   whatsapp_initial_replies:['inbox_id','state','provider_message_id','created_at'],
   company_whatsapp_inbox:['id','company_id','phone_number_id','message_id','sender','message_type','body','received_at'],
-  company_whatsapp_connections:['company_id','waba_id','phone_number_id','display_phone','encrypted_token','connected_by','connected_at'],
+  company_whatsapp_connections:['company_id','waba_id','phone_number_id','display_phone','encrypted_token','automation_enabled','enabled_at','webhook_checked_at','connected_by','connected_at'],
   store_images:['company_id','kind','content_type','content','digest'],subscription_plan_requests:['company_id','plan_code','status','created_at','updated_at']
  };
  return Object.entries(schema).flatMap(([table_name,names])=>names.map(column_name=>({table_name,column_name,column_type:column_name==='id'?'int unsigned':'varchar(500)'})));

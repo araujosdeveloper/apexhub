@@ -6,8 +6,9 @@ const { createDecipheriv } = require('node:crypto');
 const { installWhatsAppConnection } = require('../src/whatsapp-connection');
 
 function harness({ matches = true, duplicate = false } = {}) {
-  const app = { get() {}, post(_path, ...handlers) { this.save = handlers.at(-1); } };
+  const app = { get() {}, patch(_path, ...handlers) { this.change = handlers.at(-1); }, post(_path, ...handlers) { this.save = handlers.at(-1); } };
   const env = {
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: 'verify',
     WHATSAPP_META_APP_ID: '100',
     WHATSAPP_META_CONFIG_ID: '200',
     WHATSAPP_META_APP_SECRET: 'fixture',
@@ -15,13 +16,20 @@ function harness({ matches = true, duplicate = false } = {}) {
     WHATSAPP_CONNECTION_KEY: 'a'.repeat(64)
   };
   const db = { async execute(sql, params) {
+    if (sql.includes('FROM subscriptions')) return [[{ plan_code: 'pro', status: 'active' }]];
+    if (sql.includes('SELECT company_id, phone_number_id, waba_id, encrypted_token')) {
+      return [[{ company_id: 42, phone_number_id: '400', waba_id: '300', encrypted_token: this.saved[4] }]];
+    }
     if (sql.startsWith('SELECT')) return [[]];
+    if (sql.startsWith('UPDATE')) { this.update = sql; return [{ affectedRows: 1 }]; }
     this.saved = params;
     if (duplicate) throw Object.assign(new Error(), { code: 'ER_DUP_ENTRY' });
   } };
   const fetchGraph = async url => ({
     ok: true,
     async json() {
+      if (url.pathname.endsWith('/400')) return { id: '400' };
+      if (url.pathname.endsWith('/subscribed_apps')) return { success: true };
       if (url.pathname.endsWith('/oauth/access_token')) return { access_token: 'private-token' };
       if (url.pathname.endsWith('/debug_token')) return { data: {
         is_valid: true,
@@ -36,7 +44,8 @@ function harness({ matches = true, duplicate = false } = {}) {
   const response = { status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
   const run = () => app.save({ tenantId: 42, user: { id: 7 },
     body: { code: 'one-time-code', wabaId: '300', phoneId: '400' } }, response, error => { throw error; });
-  return { db, response, run, env };
+  const change = action => app.change({ tenantId: 42, body: { action } }, response, error => { throw error; });
+  return { db, response, run, env, change };
 }
 
 test('WhatsApp armazena a autorização cifrada e devolve somente o número público', async () => {
@@ -61,4 +70,16 @@ test('WhatsApp rejeita número que a Meta não confirmou e conflito simultâneo 
   const race = harness({ duplicate: true });
   await race.run();
   assert.equal(race.response.code, 409);
+});
+
+
+test('testar a inscrição mantém o bot pausado até a ativação explícita', async () => {
+  const { db, run, change } = harness();
+  await run();
+  await change('test');
+  assert.doesNotMatch(db.update, /automation_enabled = 1/);
+  await change('activate');
+  assert.match(db.update, /automation_enabled = 1/);
+  await change('pause');
+  assert.match(db.update, /automation_enabled = 0/);
 });

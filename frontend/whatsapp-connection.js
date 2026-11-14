@@ -32,7 +32,7 @@
     });
   }
 
-  function launch(config) {
+  function launch(config, reconnect) {
     button.disabled = true;
     notice.textContent = 'Conclua a autorização na janela da Meta.';
     let code;
@@ -53,10 +53,10 @@
       api({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, ...account })
+        body: JSON.stringify({ code, ...account, reconnect })
       }).then(result => {
         if (!result) throw new Error('Entre novamente com a conta do proprietário.');
-        showConnected(result.connection);
+        window.location.reload();
       }).catch(error => {
         notice.textContent = error.message;
         button.disabled = false;
@@ -93,26 +93,62 @@
     }
   }
 
-  function showConnected(connection) {
-    notice.textContent = 'Número vinculado: ' + connection.display_phone + '. Ativação do atendimento pendente.';
-    button.hidden = true;
+  const test = document.getElementById('test-whatsapp');
+  const toggle = document.getElementById('toggle-whatsapp');
+  const disconnect = document.getElementById('disconnect-whatsapp');
+
+  function render(data) {
+    const { connection, eligible } = data;
+    notice.textContent = connection
+      ? 'Número vinculado: ' + connection.display_phone + '. ' + (!eligible
+        ? 'Seu plano não libera a automação.' : Number(connection.automation_enabled)
+          ? 'Automação ativa.' : 'Automação pausada.')
+      : eligible ? 'Autorize o número comercial da sua loja na Meta.' : 'Disponível no Pro ativo e durante o período de teste.';
+    test.hidden = !connection || !eligible;
+    toggle.hidden = !connection || (!eligible && !Number(connection.automation_enabled));
+    disconnect.hidden = !connection;
+    toggle.textContent = Number(connection?.automation_enabled) ? 'Pausar automação' : 'Ativar automação';
+  }
+
+  async function action(name) {
+    const controls = [test, toggle, disconnect, button];
+    controls.forEach(control => { control.disabled = true; });
+    try {
+      const result = await api({
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: name })
+      });
+      if (!result) throw new Error('Entre novamente com a conta do proprietário.');
+      if (name === 'test') notice.textContent = 'A Meta confirmou o acesso ao número e a inscrição da conta no webhook.';
+      else window.location.reload();
+    } catch (error) {
+      notice.textContent = error.message;
+    } finally {
+      controls.forEach(control => { control.disabled = false; });
+    }
   }
 
   api().then(async data => {
     if (!data) return;
     panel.hidden = false;
-    if (data.connection) return showConnected(data.connection);
-    if (!data.eligible) {
-      notice.textContent = 'Disponível no Pro ativo e durante o período de teste.';
-      return;
-    }
+    render(data);
+    test.onclick = () => action('test');
+    toggle.onclick = () => action(Number(data.connection?.automation_enabled) ? 'pause' : 'activate');
+    disconnect.onclick = () => {
+      if (window.confirm('Desconectar este número do Apex?')) action('disconnect');
+    };
     if (!data.signup) {
-      notice.textContent = 'A conexão com a Meta ainda está indisponível.';
+      if (!data.connection && data.eligible) notice.textContent = 'A conexão com a Meta ainda está indisponível.';
       return;
     }
-    await loadSdk(data.signup);
-    notice.textContent = 'Autorize o número comercial da sua loja na Meta.';
-    button.addEventListener('click', () => launch(data.signup));
+    try {
+      await loadSdk(data.signup);
+    } catch {
+      notice.textContent = 'Não foi possível carregar a autorização da Meta.';
+      return;
+    }
+    button.textContent = data.connection ? 'Reconectar número' : 'Conectar WhatsApp';
+    button.addEventListener('click', () => launch(data.signup, Boolean(data.connection)));
     button.disabled = false;
     button.hidden = false;
   }).catch(() => {

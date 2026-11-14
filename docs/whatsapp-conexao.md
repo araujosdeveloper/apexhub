@@ -58,3 +58,11 @@ A equipe pode assumir a conversa, conferir mensagens recentes e o carrinho,
 responder pelo número da loja e retomar o bot. Ao retomar, o bot só processa
 mensagens posteriores à retomada. A migração 034 persiste a pausa e as
 tentativas da equipe. Resultado incerto precisa ser conferido no WhatsApp.
+
+A migração 035 adiciona o controle de automação por loja. O proprietário
+pode testar a credencial e a inscrição da conta na Meta, ativar ou pausar
+o bot, renovar a autorização do mesmo número e desconectar o vínculo local.
+Antes da ativação, configure a assinatura do webhook no aplicativo Meta e
+registre o número na plataforma quando exigido. Teste recebimento e envio
+com a Bebella para confirmar o funcionamento. Ao ativar, o bot processa
+mensagens novas; pedidos anteriores permanecem no histórico.
